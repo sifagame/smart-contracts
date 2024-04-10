@@ -1,34 +1,10 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
+import { deployRewardsLock } from "./helpers";
 
 import { expect } from "chai";
-import hre from "hardhat";
 
 describe("RewardsLock", function () {
-  async function deploySifaToken() {
-    const [owner, otherAccount] = await hre.ethers.getSigners();
-    const SifaToken = await hre.ethers.getContractFactory("SifaToken");
-    const sifa = await SifaToken.deploy(owner);
-
-    return { sifa, owner, otherAccount };
-  }
-
-  async function deployVault() {
-    const { sifa, owner, otherAccount } = await loadFixture(deploySifaToken);
-    const Vault = await hre.ethers.getContractFactory("Vault");
-    const vault = await Vault.deploy(sifa);
-
-    return { vault, sifa, owner, otherAccount };
-  }
-
-  async function deployRewardsLock() {
-    const { vault, sifa, owner, otherAccount } = await loadFixture(deployVault);
-    const RewardsLock = await hre.ethers.getContractFactory("RewardsLock");
-    const lock = await RewardsLock.deploy(sifa, vault);
-
-    return { lock, vault, sifa, owner, otherAccount };
-  }
-
   describe("Deployment", () => {
     it("Should have correct owner, token and initial supply", async () => {
       const { lock, vault, sifa } = await loadFixture(deployRewardsLock);
@@ -72,8 +48,8 @@ describe("RewardsLock", function () {
       expect(await lock.unlocked()).to.equal(1000_000000000000000000n);
       expect(await lock.locked()).to.equal(0);
 
-	  await time.increase(100);
-	  await expect(lock.withdraw()).to.be.revertedWith("Nothing to unlock");
+      await time.increase(100);
+      await expect(lock.withdraw()).to.be.revertedWith("Nothing to unlock");
     });
   });
 });

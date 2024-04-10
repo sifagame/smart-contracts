@@ -1,16 +1,8 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
-import hre from "hardhat";
+import { deploySifaToken } from "./helpers";
 
 describe("SifaToken", function () {
-  async function deploySifaToken() {
-    const [owner, otherAccount] = await hre.ethers.getSigners();
-    const SifaToken = await hre.ethers.getContractFactory("SifaToken");
-    const sifa = await SifaToken.deploy(owner);
-
-    return { sifa, owner, otherAccount };
-  }
-
   describe("Deployment", function () {
     it("Should have correct owner, name and supply", async function () {
       const { sifa, owner } = await loadFixture(deploySifaToken);
