@@ -1,38 +1,73 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Ownable, ERC20} from "./SifaToken.sol";
+import {Ownable, IERC20} from "./SifaToken.sol";
 
 interface IWETH9 {
     function deposit() external payable;
+
     function withdraw(uint256 _amount) external;
 }
 
-contract SifaPublicSale is Ownable {
+contract PublicSale is Ownable {
     error ESaleIsNotActive();
     error ETokensAreLocked();
-	error ESaleIsNotFinished();
+    error ESaleIsNotFinished();
 
-	event Sold(address to, uint256 value);
+    event Sold(address to, uint256 value);
     event Withdrawn(address to, uint256 value);
 
     mapping(address account => uint256) private _balances;
 
-	address public weth = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address public dexPairAddress;
-    address public vaultAddress;
-    address public sifaToken;
+    address public immutable weth = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
+    address public immutable dexPair;
+    address public immutable unsoldContract;
+    IERC20 public immutable token;
 
-    uint256 public price = 5 * 10 ** 11;
-    uint256 public minSaleSifa = 20000 * 10 ** 18;
-    uint256 public maxSaleSifa = 2000000 * 10 ** 18;
-    uint256 public totalSifaToSale = 220000000 * 10 ** 18;
-    uint256 public totalSifaToDex = 110000000 * 10 ** 18;
+    uint256 public immutable tokensPerEth = 2000000;
+    uint256 public immutable minSale = 20000;
+    uint256 public immutable maxSale = 2000000;
+    uint256 public saleAmount;
+    uint256 public dexAmount;
+    uint256 public immutable percentToDex = 50;
 
-    uint256 public saleStart = 1713139200; // April 15 2024
-    uint256 public saleEnd = saleStart + 86400 * 14; // +2 weeks
-    uint256 public unlockTime = saleEnd + 86400 * 1; // Tokens unlocked after 1 day
+    uint256 public immutable saleStart;
+    uint256 public immutable saleEnd;
+    uint256 public immutable unlockAt;
 
+    /**
+     * Deploy the contract
+     * @param _initialOwner Owner of the contract
+     * @param _token Token to sale
+     * @param _unsold Rewards Lock contract to send unsold tokens
+     * @param _dex Dex Pair to feed after sale finishes
+     * @param _start Sale start time
+     * @param _end Sale end time
+     * @param _unlock Tokens unlock time
+     */
+    constructor(
+        address _initialOwner,
+        address _token,
+        address _unsold,
+        address _dex,
+        uint256 _start,
+        uint256 _end,
+        uint256 _unlock
+    ) Ownable(_initialOwner) {
+        token = IERC20(_token);
+        unsoldContract = _unsold;
+        dexPair = _dex;
+        require(_start >= block.timestamp, "Start in the past");
+        require(_start < _end, "End before start");
+        require(_end < _unlock, "Unlock before end");
+        saleStart = _start;
+        saleEnd = _end;
+        unlockAt = _unlock;
+    }
+
+    /**
+     * Whether the sale is active (timestamp is between start and end time)
+     */
     modifier activeSale() {
         if (block.timestamp < saleStart || block.timestamp > saleEnd) {
             revert ESaleIsNotActive();
@@ -40,68 +75,102 @@ contract SifaPublicSale is Ownable {
         _;
     }
 
-	modifier finishedSale() {
-		if (block.timestamp < saleEnd) {
-			revert ESaleIsNotFinished();
-		}
-		_;
-	}
+    /**
+     * Whether the sale is finished
+     */
+    modifier finishedSale() {
+        if (block.timestamp < saleEnd) {
+            revert ESaleIsNotFinished();
+        }
+        _;
+    }
 
+    /**
+     * Whether sold tokens are available to withdraw
+     */
     modifier tokensUnlocked() {
-        if (block.timestamp < unlockTime) {
+        if (block.timestamp < unlockAt) {
             revert ETokensAreLocked();
         }
         _;
     }
 
+    /**
+     * Receive ETH and perform the sale
+     */
     receive() external payable {
-        uint256 toSell = msg.value * price;
-		_sale(msg.sender, toSell);
+        require(msg.value >= minSaleEther(), "Less than min sale");
+        require(msg.value <= maxSaleEther(), "More than max sale");
+        uint256 amount = msg.value * tokensPerEth;
+        _sale(msg.sender, amount);
     }
 
-	function _sale(address to, uint256 value) private activeSale {
-		require(value >= minSaleSifa, "Less than min sale");
+    function minSaleEther() public pure returns (uint256) {
+        return (minSale * 10 ** 18) / tokensPerEth;
+    }
+
+    function maxSaleEther() public pure returns (uint256) {
+        return (maxSale * 10 ** 18) / tokensPerEth;
+    }
+
+    /**
+     * Display the balance of account (sold tokens)
+     * @param account Account to check the balance of
+     */
+    function balanceOf(address account) external view returns (uint256) {
+        return _balances[account];
+    }
+
+    /**
+     * Deposit funds to the sale
+     * @param _amount Amount of tokens to sale
+     */
+    function deposit(uint256 _amount) external returns (bool) {
+        require(block.timestamp < saleStart, "Sale started");
+        uint256 toSell = (_amount / (100 + percentToDex)) * 100;
+        uint256 toDex = (_amount / (100 + percentToDex)) * percentToDex;
+        saleAmount += toSell;
+        dexAmount += toDex;
+        token.transferFrom(msg.sender, address(this), _amount);
+        return true;
+    }
+
+    function _sale(address to, uint256 amount) private activeSale {
         require(
-            _balances[to] + value <= maxSaleSifa,
-            "Exceeds max sale"
+            _balances[to] + amount <= maxSale * 10 ** 18,
+            "More than max sale"
         );
-        _balances[to] += value;
-		emit Sold(to, value);
-	}
+        require(
+            amount <= saleAmount,
+            "Remaining sale amount is less then requested"
+        );
+        _balances[to] += amount;
+        saleAmount -= amount;
+        emit Sold(to, amount);
+    }
 
     function withdraw() public virtual tokensUnlocked {
         uint256 value = _balances[msg.sender];
         require(value > 0, "Nothing to withdraw");
-        ERC20(sifaToken).transferFrom(address(this), msg.sender, value);
+        token.transfer(msg.sender, value);
         _balances[msg.sender] = 0;
         emit Withdrawn(msg.sender, value);
     }
 
-	function finish() public virtual onlyOwner finishedSale {
-		uint256 raisedEther = address(this).balance;
-		uint256 etherToPool = raisedEther / 2;
-		uint256 etherToOwner = raisedEther - etherToPool;
+    function dex() public virtual onlyOwner finishedSale {
+        uint256 raisedEther = address(this).balance;
+        uint256 etherToPool = raisedEther / 2;
+        uint256 etherToOwner = raisedEther - etherToPool;
 
-		// Exchange ETH to WETH.
-		(bool sentWeth, ) = weth.call{ value: etherToPool }("");
-		require(sentWeth, "Fail WETH convert");
+        // Exchange ETH to WETH.
+        (bool sentWeth, ) = weth.call{value: etherToPool}("");
+        require(sentWeth, "Fail WETH convert");
 
-		// Feed the dex pair with liquidity.
-		// Send unsold SIFA to the vault.
+        // Feed the dex pair with liquidity.
+        // Send unsold SIFA to the vault.
 
-		// Send remaining ETH to the owner.
-		(bool sentEthOwner, ) = owner().call{ value: etherToOwner }("");
-		require(sentEthOwner, "Fail ETH to owner");
-	}
-
-    constructor(
-        address initialOwner,
-        address sifa,
-        address vault,
-        address dex
-    ) Ownable(initialOwner) {
-        sifaToken = sifa;
-        vaultAddress = vault;
-        dexPairAddress = dex;
+        // Send remaining ETH to the owner.
+        (bool sentEthOwner, ) = owner().call{value: etherToOwner}("");
+        require(sentEthOwner, "Fail ETH to owner");
     }
 }
