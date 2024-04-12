@@ -29,7 +29,7 @@ export async function deployRewardsLock() {
 }
 
 export async function deployPublicSale() {
-  const [owner, dex, buyer1, buyer2] = await hre.ethers.getSigners();
+  const [owner, buyer1, buyer2] = await hre.ethers.getSigners();
   const { lock, sifa } = await loadFixture(deployRewardsLock);
   const PublicSale = await hre.ethers.getContractFactory("PublicSale");
   const start = (await time.latest()) + 86400 * 5;
@@ -39,10 +39,9 @@ export async function deployPublicSale() {
     owner,
     sifa,
     lock,
-    dex,
     start,
     end,
     unlock
   );
-  return { sale, lock, sifa, owner, dex, start, end, unlock, buyer1, buyer2 };
+  return { sale, lock, sifa, owner, start, end, unlock, buyer1, buyer2 };
 }

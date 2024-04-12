@@ -8,49 +8,48 @@ import { expect } from "chai";
 
 describe("Deployments", () => {
   it("Should revert if start time is in the past", async () => {
-    const [owner, dex] = await ethers.getSigners();
+    const [owner] = await ethers.getSigners();
     const { lock, sifa } = await loadFixture(deployRewardsLock);
     const PublicSale = await ethers.getContractFactory("PublicSale");
     const start = (await time.latest()) - 1;
     const end = (await time.latest()) + 86400 * 15;
     const unlock = (await time.latest()) + 86400 * 17;
     await expect(
-      PublicSale.deploy(owner, sifa, lock, dex, start, end, unlock)
+      PublicSale.deploy(owner, sifa, lock, start, end, unlock)
     ).to.revertedWith("Start in the past");
   });
 
   it("Should revert if end time is before start", async () => {
-    const [owner, dex] = await ethers.getSigners();
+    const [owner] = await ethers.getSigners();
     const { lock, sifa } = await loadFixture(deployRewardsLock);
     const PublicSale = await ethers.getContractFactory("PublicSale");
     const start = (await time.latest()) + 86400 * 2;
     const end = (await time.latest()) + 86400;
     const unlock = (await time.latest()) + 86400 * 17;
     await expect(
-      PublicSale.deploy(owner, sifa, lock, dex, start, end, unlock)
+      PublicSale.deploy(owner, sifa, lock, start, end, unlock)
     ).to.revertedWith("End before start");
   });
 
   it("Should revert if unlock time is before end", async () => {
-    const [owner, dex] = await ethers.getSigners();
+    const [owner] = await ethers.getSigners();
     const { lock, sifa } = await loadFixture(deployRewardsLock);
     const PublicSale = await ethers.getContractFactory("PublicSale");
     const start = (await time.latest()) + 86400 * 2;
     const end = (await time.latest()) + 86400 * 5;
     const unlock = (await time.latest()) + 86400 * 4;
     await expect(
-      PublicSale.deploy(owner, sifa, lock, dex, start, end, unlock)
+      PublicSale.deploy(owner, sifa, lock, start, end, unlock)
     ).to.revertedWith("Unlock before end");
   });
 
   it("Should deploy with correct settings", async () => {
-    const { sale, lock, dex } = await loadFixture(deployPublicSale);
+    const { sale, lock } = await loadFixture(deployPublicSale);
     expect(await sale.tokensPerEth()).to.equal(2000000);
     expect(await sale.minSale()).to.equal(20000);
     expect(await sale.maxSale()).to.equal(2000000);
     expect(await sale.saleAmount()).to.equal(0);
     expect(await sale.dexAmount()).to.equal(0);
-    expect(await sale.dexPair()).to.equal(dex);
     expect(await sale.unsoldContract()).to.equal(lock);
   });
 });

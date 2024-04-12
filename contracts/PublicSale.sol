@@ -19,8 +19,6 @@ contract PublicSale is Ownable {
 
     mapping(address account => uint256) private _balances;
 
-    address public immutable weth = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address public immutable dexPair;
     address public immutable unsoldContract;
     IERC20 public immutable token;
 
@@ -40,7 +38,6 @@ contract PublicSale is Ownable {
      * @param _initialOwner Owner of the contract
      * @param _token Token to sale
      * @param _unsold Rewards Lock contract to send unsold tokens
-     * @param _dex Dex Pair to feed after sale finishes
      * @param _start Sale start time
      * @param _end Sale end time
      * @param _unlock Tokens unlock time
@@ -49,14 +46,12 @@ contract PublicSale is Ownable {
         address _initialOwner,
         address _token,
         address _unsold,
-        address _dex,
         uint256 _start,
         uint256 _end,
         uint256 _unlock
     ) Ownable(_initialOwner) {
         token = IERC20(_token);
         unsoldContract = _unsold;
-        dexPair = _dex;
         require(_start >= block.timestamp, "Start in the past");
         require(_start < _end, "End before start");
         require(_end < _unlock, "Unlock before end");
@@ -159,15 +154,14 @@ contract PublicSale is Ownable {
 
     function dex() public virtual onlyOwner finishedSale {
         uint256 raisedEther = address(this).balance;
-        uint256 etherToPool = raisedEther / 2;
-        uint256 etherToOwner = raisedEther - etherToPool;
-
-        // Exchange ETH to WETH.
-        (bool sentWeth, ) = weth.call{value: etherToPool}("");
-        require(sentWeth, "Fail WETH convert");
+        uint256 etherToDex = raisedEther / 100 * percentToDex;
+        uint256 etherToOwner = raisedEther - etherToDex;
 
         // Feed the dex pair with liquidity.
-        // Send unsold SIFA to the vault.
+
+		// Send unsold tokens to the vault.
+		uint256 unsoldTokens = token.balanceOf(address(this));
+		token.transfer(unsoldContract, unsoldTokens);
 
         // Send remaining ETH to the owner.
         (bool sentEthOwner, ) = owner().call{value: etherToOwner}("");
