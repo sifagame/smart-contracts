@@ -1,0 +1,33 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [develop, main]
+
+env:
+  REPORT_GAS: true
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version-file: '.nvmrc'
+    - uses: actions/cache@v3
+      id: npm-cache
+      with:
+        path: |
+          ./node_modules
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+    - name: Install
+      run: npm ci
+    - name: Build
+      run: npx hardhat compile
+    - name: Test
+      run: npm run test
