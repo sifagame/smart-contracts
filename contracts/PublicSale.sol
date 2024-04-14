@@ -26,7 +26,6 @@ contract PublicSale is Ownable {
     uint256 public immutable minSale = 20000;
     uint256 public immutable maxSale = 2000000;
     uint256 public saleAmount;
-    uint256 public dexAmount;
     uint256 public immutable percentToDex = 50;
 
     uint256 public immutable saleStart;
@@ -123,9 +122,7 @@ contract PublicSale is Ownable {
     function deposit(uint256 _amount) external returns (bool) {
         require(block.timestamp < saleStart, "Sale started");
         uint256 toSell = (_amount / (100 + percentToDex)) * 100;
-        uint256 toDex = (_amount / (100 + percentToDex)) * percentToDex;
         saleAmount += toSell;
-        dexAmount += toDex;
         token.transferFrom(msg.sender, address(this), _amount);
         return true;
     }
