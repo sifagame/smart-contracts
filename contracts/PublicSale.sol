@@ -3,12 +3,6 @@ pragma solidity ^0.8.24;
 
 import {Ownable, IERC20} from "./SifaToken.sol";
 
-interface IWETH9 {
-    function deposit() external payable;
-
-    function withdraw(uint256 _amount) external;
-}
-
 contract PublicSale is Ownable {
     error ESaleIsNotActive();
     error ETokensAreLocked();
