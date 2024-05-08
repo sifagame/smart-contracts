@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^0.8;
 
 import {IERC20} from "./SifaToken.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract Vault {
+contract Vault is ReentrancyGuard {
+    event Deposited(address from, uint256 amount, uint256 shares);
+    event Withdrawn(address to, uint256 amount, uint256 shares);
+
     IERC20 public immutable token;
 
     uint256 public totalSupply;
@@ -23,7 +27,15 @@ contract Vault {
         balanceOf[_from] -= _shares;
     }
 
-    function deposit(uint256 _amount) external {
+    function _tokensForShares(uint256 _shares) internal view returns (uint256) {
+        return (_shares * token.balanceOf(address(this))) / totalSupply;
+    }
+
+    function rewards() external view returns (uint256) {
+        return _tokensForShares(balanceOf[msg.sender]);
+    }
+
+    function deposit(uint256 _amount) external nonReentrant {
         uint256 shares;
         if (totalSupply == 0) {
             shares = _amount;
@@ -32,12 +44,14 @@ contract Vault {
         }
         _mint(msg.sender, shares);
         token.transferFrom(msg.sender, address(this), _amount);
+        emit Deposited(msg.sender, _amount, shares);
     }
 
-    function withdraw(uint256 _shares) external {
-        uint256 amount =
-            (_shares * token.balanceOf(address(this))) / totalSupply;
+    function withdraw(uint256 _shares) external nonReentrant {
+        uint256 amount = (_shares * token.balanceOf(address(this))) /
+            totalSupply;
         _burn(msg.sender, _shares);
         token.transfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, amount, _shares);
     }
 }
