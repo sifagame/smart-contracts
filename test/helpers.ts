@@ -17,10 +17,10 @@ export async function deployVault() {
   return { vault, sifa, owner, otherAccount };
 }
 
-export async function deployRewardsLock() {
+export async function deployEmitter() {
   const { vault, sifa, owner, otherAccount } = await loadFixture(deployVault);
-  const RewardsLock = await hre.ethers.getContractFactory("RewardsLock");
-  const lock = await RewardsLock.deploy(sifa, vault);
+  const Emitter = await hre.ethers.getContractFactory("Emitter");
+  const emitter = await Emitter.deploy(sifa, vault, owner);
 
-  return { lock, vault, sifa, owner, otherAccount };
+  return { emitter, vault, sifa, owner, otherAccount };
 }
