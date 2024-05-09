@@ -6,8 +6,6 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {EmissionRates} from "./EmissionRates.sol";
 
-import {console} from "hardhat/console.sol";
-
 interface IEmitter {
     event Filled(address from, uint256 amount);
     event Started(address by);
