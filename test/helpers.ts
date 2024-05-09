@@ -17,6 +17,14 @@ export async function deployVault() {
   return { vault, sifa, owner, otherAccount };
 }
 
+export async function deployVestingVault() {
+	const { sifa, owner, otherAccount } = await loadFixture(deploySifaToken);
+	const VestingVault = await hre.ethers.getContractFactory("VestingVault");
+	const vestingVault = await VestingVault.deploy(owner, sifa);
+  
+	return { vestingVault, sifa, owner, otherAccount };
+  }
+
 export async function deployEmitter() {
   const { vault, sifa, owner, otherAccount } = await loadFixture(deployVault);
   const Emitter = await hre.ethers.getContractFactory("Emitter");
