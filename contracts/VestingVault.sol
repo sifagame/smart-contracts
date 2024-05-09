@@ -28,7 +28,10 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
         _token = IERC20(token);
     }
 
-    function setup(uint64 startTime, uint64 durationTime) public virtual {
+    function setup(
+        uint64 startTime,
+        uint64 durationTime
+    ) public virtual onlyOwner {
         if (_start != 0) {
             revert VestingVaultAlreadySetup();
         }
