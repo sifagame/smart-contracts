@@ -7,29 +7,6 @@ import { ethers } from "hardhat";
 
 describe("Faucet", () => {
   describe("Construct", () => {
-    it("Should revert deploy with wrong token", async () => {
-      const Faucet = await ethers.getContractFactory("Faucet");
-      await expect(
-        Faucet.deploy(
-          ethers.getAddress("0x0000000000000000000000000000000000000000"),
-          10,
-          10
-        )
-      ).to.be.revertedWith("Bad token");
-    });
-
-    it("Should revert deploy with zero drop amount", async () => {
-      const { sifa } = await loadFixture(deploySifaToken);
-      const Faucet = await ethers.getContractFactory("Faucet");
-      await expect(Faucet.deploy(sifa, 0, 10)).to.be.revertedWith("Too little");
-    });
-
-    it("Should revert deploy with zero delay", async () => {
-      const { sifa } = await loadFixture(deploySifaToken);
-      const Faucet = await ethers.getContractFactory("Faucet");
-      await expect(Faucet.deploy(sifa, 10, 0)).to.be.revertedWith("Add delay");
-    });
-
     it("Should deploy", async () => {
       const { sifa } = await loadFixture(deploySifaToken);
       const Faucet = await ethers.getContractFactory("Faucet");

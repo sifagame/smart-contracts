@@ -21,9 +21,6 @@ contract Faucet is Context {
     }
 
     constructor(address token_, uint256 dropAmount_, uint256 delay_) {
-        require(token_ != address(0), "Bad token");
-        require(dropAmount_ > 0, "Too little");
-        require(delay_ > 0, "Add delay");
         TOKEN = token_;
         DROP_AMOUNT = dropAmount_;
         DELAY = delay_;
