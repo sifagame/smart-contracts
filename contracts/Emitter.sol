@@ -67,11 +67,6 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         vault = _vault;
     }
 
-    function _epochTokens(uint256 _epoch) internal view returns (uint256) {
-        uint _rate = this.rates(_epoch);
-        return _rate * epochLength;
-    }
-
     function _epochRange(
         uint256 _start,
         uint256 _end
@@ -132,13 +127,6 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         } else {
             return (_time - started) / epochLength;
         }
-    }
-
-    function epochData(
-        uint256 _epoch
-    ) external view returns (uint256, uint256, uint256) {
-        (uint256 _start, uint256 _end) = _epochStartEnd(_epoch);
-        return (_start, _end, this.rates(_epoch));
     }
 
     function rate() external view returns (uint256) {
