@@ -43,9 +43,7 @@ describe("Faucet", () => {
 
   describe("Drop", () => {
     it("Should drop with schedule", async () => {
-      const { faucet, sifa, owner, otherAccount } = await loadFixture(
-        deployFaucet
-      );
+      const { faucet, sifa, otherAccount } = await loadFixture(deployFaucet);
 
       sifa.transfer(faucet, ethers.parseEther("1000000"));
 
