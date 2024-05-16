@@ -126,9 +126,9 @@ describe("Vault", function () {
       const account1Shares = await vault.balanceOf(account1);
       const account2Shares = await vault.balanceOf(account2);
 
-      expect(await vault.rewards()).equals(1204n);
-      expect(await vault.connect(account1).rewards()).equals(1095n);
-      expect(await vault.connect(account2).rewards()).equals(1000n);
+      expect(await vault.rewards(owner)).equals(1204n);
+      expect(await vault.rewards(account1)).equals(1095n);
+      expect(await vault.rewards(account2)).equals(1000n);
 
       expect(await vault.withdraw(ownerShares / 2n))
         .to.emit(vault, "Withdrawn")
@@ -143,7 +143,7 @@ describe("Vault", function () {
         .withArgs(owner, 1000, ownerShares);
 
       await sifa.transfer(vault, 200);
-      expect(await vault.rewards()).equals(803n);
+      expect(await vault.rewards(owner)).equals(803n);
 
       expect(await vault.withdraw(ownerShares / 2n))
         .to.emit(vault, "Withdrawn")
