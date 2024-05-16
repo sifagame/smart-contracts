@@ -24,7 +24,7 @@ describe("Faucet", () => {
 
       sifa.transfer(faucet, ethers.parseEther("1000000"));
 
-      expect(await faucet.connect(otherAccount).available()).equals(true);
+      expect(await faucet.available(otherAccount)).equals(true);
       await expect(faucet.connect(otherAccount).drop()).to.emit(
         faucet,
         "Dropped"
@@ -35,14 +35,14 @@ describe("Faucet", () => {
 
       await time.increase(100);
 
-      expect(await faucet.connect(otherAccount).available()).equals(false);
+      expect(await faucet.available(otherAccount)).equals(false);
       await expect(faucet.connect(otherAccount).drop()).to.be.revertedWith(
         "Wait"
       );
 
       await time.increase(60 * 60 * 24);
 
-      expect(await faucet.connect(otherAccount).available()).equals(true);
+      expect(await faucet.available(otherAccount)).equals(true);
       await expect(faucet.connect(otherAccount).drop()).to.emit(
         faucet,
         "Dropped"

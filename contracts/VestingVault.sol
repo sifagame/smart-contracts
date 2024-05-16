@@ -70,22 +70,22 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
     /**
      * @dev Amount of tokens already released
      */
-    function released() public view virtual returns (uint256) {
-        return _released[_msgSender()];
+    function released(address to) public view virtual returns (uint256) {
+        return _released[to];
     }
 
     /**
      * @dev Getter for the amount of releasable tokens.
      */
-    function releasable() public view virtual returns (uint256) {
-        return vestedAmount(uint64(block.timestamp)) - released();
+    function releasable(address to) public view virtual returns (uint256) {
+        return vestedAmount(to, uint64(block.timestamp)) - released(to);
     }
 
     /**
      * @dev Amount of total tokens vested to msg.sender
      */
-    function vested() public view virtual returns (uint256) {
-        return _vested[_msgSender()];
+    function vested(address to) public view virtual returns (uint256) {
+        return _vested[to];
     }
 
     /**
@@ -110,7 +110,7 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
      */
     function release() public virtual nonReentrant {
         address vester = _msgSender();
-        uint256 amount = releasable();
+        uint256 amount = releasable(vester);
         if (amount == 0) {
             revert VestingVaultNothingToRelease();
         }
@@ -123,9 +123,10 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
      * @dev Calculates the amount of tokens that has already vested. Default implementation is a linear vesting curve.
      */
     function vestedAmount(
+		address to,
         uint64 timestamp
     ) public view virtual returns (uint256) {
-        return _vestingSchedule(_vested[_msgSender()], timestamp);
+        return _vestingSchedule(_vested[to], timestamp);
     }
 
     /**

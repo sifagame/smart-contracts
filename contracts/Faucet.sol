@@ -16,7 +16,7 @@ contract Faucet is Context {
     event Dropped(uint256 amount);
 
     modifier canDrop() {
-        require(available(), "Wait");
+        require(available(_msgSender()), "Wait");
         _;
     }
 
@@ -26,8 +26,8 @@ contract Faucet is Context {
         DELAY = delay_;
     }
 
-    function available() public view returns (bool) {
-        uint256 at = _availableAt[_msgSender()];
+    function available(address from) public view returns (bool) {
+        uint256 at = _availableAt[from];
         return at == 0 || at < block.timestamp;
     }
 

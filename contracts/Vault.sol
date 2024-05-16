@@ -31,8 +31,8 @@ contract Vault is ReentrancyGuard {
         return (_shares * token.balanceOf(address(this))) / totalSupply;
     }
 
-    function rewards() external view returns (uint256) {
-        return _tokensForShares(balanceOf[msg.sender]);
+    function rewards(address to) external view returns (uint256) {
+        return _tokensForShares(balanceOf[to]);
     }
 
     function deposit(uint256 _amount) external nonReentrant {

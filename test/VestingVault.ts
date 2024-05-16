@@ -116,21 +116,21 @@ describe("Vesting Vault", () => {
       await vestingVault.vest(account1, amount);
 
       await time.increaseTo(start);
-      expect(await vestingVault.connect(account1).vested()).equals(amount);
-      expect(await vestingVault.connect(account1).released()).equals(0);
-      expect(await vestingVault.connect(account1).releasable()).equals(0);
+      expect(await vestingVault.vested(account1)).equals(amount);
+      expect(await vestingVault.released(account1)).equals(0);
+      expect(await vestingVault.releasable(account1)).equals(0);
 
       await time.increase(10);
-      expect(await vestingVault.connect(account1).vested()).equals(amount);
-      expect(await vestingVault.connect(account1).released()).equals(0);
-      expect(await vestingVault.connect(account1).releasable()).equals(
+      expect(await vestingVault.vested(account1)).equals(amount);
+      expect(await vestingVault.released(account1)).equals(0);
+      expect(await vestingVault.releasable(account1)).equals(
         ethers.parseEther("10")
       );
 
       await time.increase(32);
-      expect(await vestingVault.connect(account1).vested()).equals(amount);
-      expect(await vestingVault.connect(account1).released()).equals(0);
-      expect(await vestingVault.connect(account1).releasable()).equals(
+      expect(await vestingVault.vested(account1)).equals(amount);
+      expect(await vestingVault.released(account1)).equals(0);
+      expect(await vestingVault.releasable(account1)).equals(
         ethers.parseEther("42")
       );
     });
@@ -148,9 +148,9 @@ describe("Vesting Vault", () => {
 
       await time.increaseTo(start - 10);
 
-      expect(await vestingVault.vested()).equals(100);
-      expect(await vestingVault.released()).equals(0);
-      expect(await vestingVault.releasable()).equals(0);
+      expect(await vestingVault.vested(owner)).equals(100);
+      expect(await vestingVault.released(owner)).equals(0);
+      expect(await vestingVault.releasable(owner)).equals(0);
       await expect(vestingVault.release()).to.be.revertedWithCustomError(
         vestingVault,
         "VestingVaultNothingToRelease"
@@ -169,9 +169,9 @@ describe("Vesting Vault", () => {
       await vestingVault.vest(account1, amount);
 
       await time.increaseTo(start);
-      expect(await vestingVault.connect(account1).vested()).equals(amount);
-      expect(await vestingVault.connect(account1).released()).equals(0);
-      expect(await vestingVault.connect(account1).releasable()).equals(0);
+      expect(await vestingVault.vested(account1)).equals(amount);
+      expect(await vestingVault.released(account1)).equals(0);
+      expect(await vestingVault.releasable(account1)).equals(0);
 
       await time.increase(419);
       const expectedRelease = ethers.parseEther("420");
@@ -180,14 +180,14 @@ describe("Vesting Vault", () => {
         .to.emit(vestingVault, "Released")
         .withArgs(expectedRelease);
       expect(await sifa.balanceOf(account1)).equals(expectedRelease);
-      expect(await vestingVault.connect(account1).vested()).equals(amount);
-      expect(await vestingVault.connect(account1).released()).equals(
+      expect(await vestingVault.vested(account1)).equals(amount);
+      expect(await vestingVault.released(account1)).equals(
         expectedRelease
       );
-      expect(await vestingVault.connect(account1).releasable()).equals(0);
+      expect(await vestingVault.releasable(account1)).equals(0);
 
       await time.increase(1000);
-      expect(await vestingVault.connect(account1).releasable()).equals(
+      expect(await vestingVault.releasable(account1)).equals(
         expectedRemainder
       );
 
