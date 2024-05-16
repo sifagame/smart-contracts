@@ -33,5 +33,5 @@ jobs:
       run: npm run test
     - name: Test Deployment
       env:
-        SIFA_ENV: local
+        ENV: local
       run: npx hardhat run scripts/deploy.ts

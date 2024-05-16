@@ -4,6 +4,7 @@ contracts/artifacts/
 
 node_modules
 .env
+.contracts
 
 # Hardhat files
 /cache
