@@ -9,6 +9,11 @@ env:
 
 jobs:
   test:
+    env:
+      ENV: local
+      TESTNET_DEPLOYER_PRIMARY_KEY: ${{ secrets.TESTNET_DEPLOYER_PRIMARY_KEY }}
+      MAINNET_DEPLOYER_PRIMARY_KEY: ${{ secrets.MAINNET_DEPLOYER_PRIMARY_KEY }}
+      ARBISCAN_API_KEY: ${{ secrets.ARBISCAN_API_KEY }}
     name: Test
     runs-on: ubuntu-latest
     steps:
@@ -32,6 +37,4 @@ jobs:
     - name: Test
       run: npm run test
     - name: Test Deployment
-      env:
-        ENV: local
       run: npx hardhat run scripts/deploy.ts
