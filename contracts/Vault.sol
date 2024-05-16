@@ -13,8 +13,8 @@ contract Vault is ReentrancyGuard {
     uint256 public totalSupply;
     mapping(address => uint256) public balanceOf;
 
-    constructor(address _token) {
-        token = IERC20(_token);
+    constructor(address token_) {
+        token = IERC20(token_);
     }
 
     function _mint(address _to, uint256 _shares) private {
