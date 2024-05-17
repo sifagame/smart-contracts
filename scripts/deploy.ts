@@ -63,6 +63,13 @@ async function main() {
 
   const vaultAddress = await vault.getAddress();
 
+  // Deposit to dead address, protect from inflation attack.
+  sifaToken.approve(vaultAddress, ethers.parseEther("1"));
+  vault.deposit(
+    ethers.parseEther("1"),
+    "0x000000000000000000000000000000000000dEaD"
+  );
+
   console.log(`Vault: ${await vault.getAddress()}`);
   if (shouldVerify()) {
     await run("verify:verify", {
