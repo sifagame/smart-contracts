@@ -13,16 +13,8 @@
     "duration": 31104000,
     "vest": [
       {
-        "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-        "amount": 2000000
-      },
-      {
-        "address": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-        "amount": 1500000
-      },
-      {
-        "address": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
-        "amount": 750000
+        "address": "0x000000000000000000000000000000000000dEaD",
+        "amount": 1000000
       }
     ]
   }
