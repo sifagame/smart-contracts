@@ -59,12 +59,12 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
     uint256 public lastWithrawalAt;
 
     constructor(
-        address _token,
-        address _vault,
-        address _initialOwner
-    ) Ownable(_initialOwner) {
-        token = IERC20(_token);
-        vault = _vault;
+        address initialOwner_,
+        address token_,
+        address vault_
+    ) Ownable(initialOwner_) {
+        token = IERC20(token_);
+        vault = vault_;
     }
 
     function _epochRange(
@@ -158,7 +158,7 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         return true;
     }
 
-	/// @dev This function might require large amount of gas when calling to withdraw after a very long period of time.
+    /// @dev This function might require large amount of gas when calling to withdraw after a very long period of time.
     function withdraw() external nonReentrant returns (bool) {
         require(started != 0, "Not started");
         uint256 amount = this.available();

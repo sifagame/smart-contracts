@@ -28,7 +28,7 @@ export async function deployVestingVault() {
 export async function deployEmitter() {
   const { vault, sifa, owner, otherAccount } = await loadFixture(deployVault);
   const Emitter = await hre.ethers.getContractFactory("Emitter");
-  const emitter = await Emitter.deploy(sifa, vault, owner);
+  const emitter = await Emitter.deploy(owner, sifa, vault);
 
   return { emitter, vault, sifa, owner, otherAccount };
 }
