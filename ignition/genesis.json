@@ -1,8 +1,9 @@
 {
   "SifaToken": {},
   "Faucet": {
-    "dropAmount": 10,
-    "delay": 86400
+    "dropAmount": 0,
+    "delay": 86400,
+    "totalSupply": 0
   },
   "Emitter": {
     "amount": 800000000

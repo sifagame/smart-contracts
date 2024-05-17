@@ -35,7 +35,7 @@ async function main() {
   }
 
   // Faucet is not for mainnet.
-  if ("mainnet" !== process.env.ENV) {
+  if ("mainnet" !== process.env.ENV && config.Faucet.totalSupply > 0) {
     const dropAmount = ethers.parseEther(config.Faucet.dropAmount.toString());
     const delay = config.Faucet.delay;
 
@@ -54,6 +54,12 @@ async function main() {
         .then(console.log)
         .catch(console.log);
     }
+
+    // Feed the faucet.
+    sifaToken.transfer(
+      await faucet.getAddress(),
+      ethers.parseEther(config.Faucet.totalSupply.toString())
+    );
   }
 
   // Deploy vault.
