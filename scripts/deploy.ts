@@ -150,14 +150,19 @@ async function main() {
     (p, v) => p + ethers.parseEther(v.amount.toString()),
     0n
   );
-  await sifaToken.approve(vestingAddress, vestingAmount);
+  if (vestingAmount > 0) {
+    await sifaToken.approve(vestingAddress, vestingAmount);
 
-  // Vest everyone.
-  for (let i = 0; i < config.Vesting.vest.length; i++) {
-    const vest = config.Vesting.vest[i];
-    const amount = ethers.parseEther(vest.amount.toString());
-    await vestingVault.vest(vest.address, amount);
-    console.log(`Vested ${amount} to ${vest.address}`);
+    // Vest everyone.
+    for (let i = 0; i < config.Vesting.vest.length; i++) {
+      const vest = config.Vesting.vest[i];
+      const amount = ethers.parseEther(vest.amount.toString());
+      if (amount <= 0) {
+        continue;
+      }
+      await vestingVault.vest(vest.address, amount);
+      console.log(`Vested ${amount} to ${vest.address}`);
+    }
   }
 }
 
