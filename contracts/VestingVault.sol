@@ -24,8 +24,8 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
     uint64 private _start;
     uint64 private _duration;
 
-    constructor(address initialOwner, address token) Ownable(initialOwner) {
-        _token = IERC20(token);
+    constructor(address initialOwner_, address token_) Ownable(initialOwner_) {
+        _token = IERC20(token_);
     }
 
     function setup(

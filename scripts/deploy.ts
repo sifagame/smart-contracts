@@ -85,9 +85,9 @@ async function main() {
   const { emitter } = await ignition.deploy(EmitterModule, {
     parameters: {
       Emitter: {
+        owner: await emitterOwner.getAddress(),
         token: tokenAddress,
         vault: vaultAddress,
-        owner: await emitterOwner.getAddress(),
       },
     },
   });
