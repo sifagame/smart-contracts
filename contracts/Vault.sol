@@ -6,11 +6,5 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC4626} from "@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol";
 
 contract Vault is ERC4626 {
-    constructor(
-        IERC20 token_
-    ) ERC4626(token_) ERC20("Sifa Vault Shares", "vSIFA") {}
-
-	function maxMint(address) override public pure returns(uint256) {
-		return 0;
-	}
+    constructor(IERC20 token_) ERC4626(token_) ERC20("Sifa Vault", "vSIFA") {}
 }
