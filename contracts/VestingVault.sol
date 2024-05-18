@@ -14,57 +14,38 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
     error VestingVaultDurationAlreadySet();
     error VestingVaultNothingToRelease();
 
-    event Setup(uint64 start, uint64 duration);
-    event Released(uint256 amount);
-    event Vested(uint256 amount, address to);
+    event Released(uint256 amount, address to);
+    event Vested(uint256 amount, address to, uint64 start, uint64 duration);
 
+    IERC20 public immutable token;
     mapping(address vester => uint256) private _vested;
     mapping(address vester => uint256) private _released;
-    IERC20 private immutable _token;
-    uint64 private _start;
-    uint64 private _duration;
+    mapping(address vester => uint64) private _start;
+    mapping(address vester => uint64) private _duration;
 
     constructor(address initialOwner_, address token_) Ownable(initialOwner_) {
-        _token = IERC20(token_);
-    }
-
-    function setup(
-        uint64 startTime,
-        uint64 durationTime
-    ) public virtual onlyOwner {
-        if (_start != 0) {
-            revert VestingVaultAlreadySetup();
-        }
-        if (startTime <= block.timestamp) {
-            revert VestingVaultStartInPast();
-        }
-        if (durationTime == 0) {
-            revert VestingVaultZeroDuration();
-        }
-        _start = startTime;
-        _duration = durationTime;
-        emit Setup(_start, _duration);
+        token = IERC20(token_);
     }
 
     /**
      * @dev Getter for the start timestamp.
      */
-    function start() public view virtual returns (uint256) {
-        return _start;
+    function start(address vester) public view virtual returns (uint256) {
+        return _start[vester];
     }
 
     /**
      * @dev Getter for the vesting duration.
      */
-    function duration() public view virtual returns (uint256) {
-        return _duration;
+    function duration(address vester) public view virtual returns (uint256) {
+        return _duration[vester];
     }
 
     /**
      * @dev Getter for the end timestamp.
      */
-    function end() public view virtual returns (uint256) {
-        return start() + duration();
+    function end(address vester) public view virtual returns (uint256) {
+        return start(vester) + duration(vester);
     }
 
     /**
@@ -93,14 +74,21 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
      *
      * Emits a {Vested} event.
      */
-    function vest(address to, uint256 amount) public virtual {
-        if (block.timestamp >= start()) {
-            revert VestingVaultVestAfterStart();
-        }
-
+    function vest(
+        address to,
+        uint256 amount,
+        uint64 start_,
+        uint64 duration_
+    ) public virtual {
         _vested[to] += amount;
-        emit Vested(amount, to);
-        _token.transferFrom(_msgSender(), address(this), amount);
+        if (_start[to] == 0) {
+            _start[to] = start_;
+        }
+        if (_duration[to] == 0) {
+            _duration[to] = duration_;
+        }
+        token.transferFrom(_msgSender(), address(this), amount);
+        emit Vested(amount, to, _start[to], _duration[to]);
     }
 
     /**
@@ -115,18 +103,19 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
             revert VestingVaultNothingToRelease();
         }
         _released[vester] += amount;
-        emit Released(amount);
-        _token.transfer(vester, amount);
+        emit Released(amount, vester);
+        token.transfer(vester, amount);
     }
 
     /**
      * @dev Calculates the amount of tokens that has already vested. Default implementation is a linear vesting curve.
      */
     function vestedAmount(
-		address to,
+        address to,
         uint64 timestamp
     ) public view virtual returns (uint256) {
-        return _vestingSchedule(_vested[to], timestamp);
+        return
+            _vestingSchedule(_vested[to], _start[to], _duration[to], timestamp);
     }
 
     /**
@@ -135,14 +124,16 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
      */
     function _vestingSchedule(
         uint256 totalAllocation,
+        uint64 start_,
+        uint64 duration_,
         uint64 timestamp
     ) internal view virtual returns (uint256) {
-        if (timestamp < start()) {
+        if (timestamp < start_) {
             return 0;
-        } else if (timestamp >= end()) {
+        } else if (timestamp >= (start_ + duration_)) {
             return totalAllocation;
         } else {
-            return (totalAllocation * (timestamp - start())) / duration();
+            return (totalAllocation * (timestamp - start_)) / duration_;
         }
     }
 }
