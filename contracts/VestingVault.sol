@@ -6,7 +6,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 
-contract VestingVault is Context, Ownable, ReentrancyGuard {
+contract VestingVault is Context, ReentrancyGuard {
     error VestingVaultZeroDuration();
     error VestingVaultStartInPast();
     error VestingVaultVestAfterStart();
@@ -23,7 +23,7 @@ contract VestingVault is Context, Ownable, ReentrancyGuard {
     mapping(address vester => uint64) private _start;
     mapping(address vester => uint64) private _duration;
 
-    constructor(address initialOwner_, address token_) Ownable(initialOwner_) {
+    constructor(address token_) {
         token = IERC20(token_);
     }
 
