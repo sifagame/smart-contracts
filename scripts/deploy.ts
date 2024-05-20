@@ -126,7 +126,6 @@ async function main() {
   const { vestingVault } = await ignition.deploy(VestingVaultModule, {
     parameters: {
       VestingVault: {
-        owner: await vestingOwner.getAddress(),
         token: tokenAddress,
       },
     },
@@ -141,9 +140,6 @@ async function main() {
       .then(console.log)
       .catch(console.log);
   }
-
-  await vestingVault.setup(config.Vesting.start, config.Vesting.duration);
-  await vestingVault.renounceOwnership();
 
   // Calculate total vesting to approve.
   const vestingAmount = config.Vesting.vest.reduce(
@@ -160,8 +156,12 @@ async function main() {
       if (amount <= 0) {
         continue;
       }
-      await vestingVault.vest(vest.address, amount);
-      console.log(`Vested ${amount} to ${vest.address}`);
+      await vestingVault.vest(vest.address, amount, vest.start, vest.duration);
+      console.log(
+        `Vested ${amount} to ${vest.address}, cliff ${
+          new Date(vest.start * 1000).toLocaleString().split(",")[0]
+        } for ${vest.duration / 24 / 60 / 60} days`
+      );
     }
   }
 }
