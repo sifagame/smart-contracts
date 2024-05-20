@@ -8,98 +8,43 @@ describe("Vesting Vault", () => {
   describe("Deployment", () => {
     it("Should deploy", async () => {
       const { vestingVault, sifa } = await loadFixture(deployVestingVault);
-
-      expect(await vestingVault.start()).to.equal(0);
-      expect(await vestingVault.end()).to.equal(0);
-      expect(await vestingVault.duration()).to.equal(0);
-    });
-  });
-
-  describe("Setup", () => {
-    it("Should revert start in past", async () => {
-      const { vestingVault } = await loadFixture(deployVestingVault);
-      const now = await time.latest();
-      const duration = 100;
-      await expect(
-        vestingVault.setup(now, duration)
-      ).to.revertedWithCustomError(vestingVault, "VestingVaultStartInPast");
-    });
-
-    it("Should revert zero duration", async () => {
-      const { vestingVault } = await loadFixture(deployVestingVault);
-      const now = await time.latest();
-      const duration = 0;
-      await expect(
-        vestingVault.setup(now + 100, duration)
-      ).to.revertedWithCustomError(vestingVault, "VestingVaultZeroDuration");
-    });
-
-    it("Should setup successfully", async () => {
-      const { vestingVault } = await loadFixture(deployVestingVault);
-      const start = (await time.latest()) + 100;
-      const duration = 420;
-      await expect(vestingVault.setup(start, duration))
-        .to.emit(vestingVault, "Setup")
-        .withArgs(start, duration);
-    });
-
-    it("Should revert already setup", async () => {
-      const { vestingVault } = await loadFixture(deployVestingVault);
-      const start = (await time.latest()) + 100;
-      const duration = 420;
-      await expect(vestingVault.setup(start, duration))
-        .to.emit(vestingVault, "Setup")
-        .withArgs(start, duration);
-
-      await expect(
-        vestingVault.setup(start + 1, duration + 10)
-      ).to.revertedWithCustomError(vestingVault, "VestingVaultAlreadySetup");
-    });
-  });
-
-  describe("Timing functions", () => {
-    it("Should return correct time", async () => {
-      const { vestingVault } = await loadFixture(deployVestingVault);
-      const now = Number(await time.latest());
-      const start = now + 1800;
-      const duration = 3600;
-      await expect(vestingVault.setup(start, duration))
-        .to.emit(vestingVault, "Setup")
-        .withArgs(start, duration);
-
-      expect(await vestingVault.start()).equals(start);
-      expect(await vestingVault.duration()).equals(duration);
-      expect(await vestingVault.end()).equals(start + duration);
+      expect(await vestingVault.token()).equals(sifa);
     });
   });
 
   describe("Vest", () => {
-    it("Should revert after start", async () => {
-      const { vestingVault, owner } = await loadFixture(deployVestingVault);
-      const start = (await time.latest()) + 100;
-      const duration = 420;
-      await vestingVault.setup(start, duration);
-      await time.increaseTo(start + 5);
-
-      await expect(vestingVault.vest(owner, 100)).to.revertedWithCustomError(
-        vestingVault,
-        "VestingVaultVestAfterStart"
-      );
-    });
-
     it("Should vest", async () => {
       const { vestingVault, sifa, owner } = await loadFixture(
         deployVestingVault
       );
       const start = (await time.latest()) + 100;
       const duration = 420;
-      await vestingVault.setup(start, duration);
-
       await sifa.approve(vestingVault, 100);
 
-      await expect(vestingVault.vest(owner, 100))
+      await expect(vestingVault.vest(owner, 100, start, duration))
         .to.emit(vestingVault, "Vested")
-        .withArgs(100, owner);
+        .withArgs(100, owner, start, duration);
+    });
+
+    it("Should ignore start adn duration after first vesting", async () => {
+      const { vestingVault, sifa, owner } = await loadFixture(
+        deployVestingVault
+      );
+      const start = (await time.latest()) + 100;
+      const duration = 420;
+      await sifa.approve(vestingVault, 1000);
+
+      await expect(vestingVault.vest(owner, 400, start, duration))
+        .to.emit(vestingVault, "Vested")
+        .withArgs(400, owner, start, duration);
+
+      await expect(vestingVault.vest(owner, 600, start + 50, duration + 100))
+        .to.emit(vestingVault, "Vested")
+        .withArgs(600, owner, start, duration);
+
+      expect(await vestingVault.start(owner)).equals(start);
+      expect(await vestingVault.duration(owner)).equals(duration);
+      expect(await vestingVault.end(owner)).equals(start + duration);
     });
   });
 
@@ -111,9 +56,8 @@ describe("Vesting Vault", () => {
       const amount = ethers.parseEther("1000");
       const start = (await time.latest()) + 100;
       const duration = 1000;
-      await vestingVault.setup(start, duration);
       await sifa.approve(vestingVault, amount);
-      await vestingVault.vest(account1, amount);
+      await vestingVault.vest(account1, amount, start, duration);
 
       await time.increaseTo(start);
       expect(await vestingVault.vested(account1)).equals(amount);
@@ -141,10 +85,9 @@ describe("Vesting Vault", () => {
       );
       const start = (await time.latest()) + 100;
       const duration = 420;
-      await vestingVault.setup(start, duration);
 
       await sifa.approve(vestingVault, 100);
-      await vestingVault.vest(owner, 100);
+      await vestingVault.vest(owner, 100, start, duration);
 
       await time.increaseTo(start - 10);
 
@@ -164,9 +107,9 @@ describe("Vesting Vault", () => {
       const amount = ethers.parseEther("1000");
       const start = (await time.latest()) + 100;
       const duration = 1000;
-      await vestingVault.setup(start, duration);
+
       await sifa.approve(vestingVault, amount);
-      await vestingVault.vest(account1, amount);
+      await vestingVault.vest(account1, amount, start, duration);
 
       await time.increaseTo(start);
       expect(await vestingVault.vested(account1)).equals(amount);
@@ -178,67 +121,17 @@ describe("Vesting Vault", () => {
       const expectedRemainder = ethers.parseEther("580");
       await expect(vestingVault.connect(account1).release())
         .to.emit(vestingVault, "Released")
-        .withArgs(expectedRelease);
+        .withArgs(expectedRelease, account1);
       expect(await sifa.balanceOf(account1)).equals(expectedRelease);
       expect(await vestingVault.vested(account1)).equals(amount);
-      expect(await vestingVault.released(account1)).equals(
-        expectedRelease
-      );
+      expect(await vestingVault.released(account1)).equals(expectedRelease);
       expect(await vestingVault.releasable(account1)).equals(0);
 
       await time.increase(1000);
-      expect(await vestingVault.releasable(account1)).equals(
-        expectedRemainder
-      );
+      expect(await vestingVault.releasable(account1)).equals(expectedRemainder);
 
       await vestingVault.connect(account1).release();
       expect(await sifa.balanceOf(account1)).equals(amount);
-    });
-
-    it("Should vest and withdraw for multiple accounts", async () => {
-      const accounts = await ethers.getSigners();
-      const amounts = [];
-      const { vestingVault, sifa } = await loadFixture(deployVestingVault);
-
-      const startTime = (await time.latest()) + 1000;
-      const duration = 60 * 60 * 24;
-      await vestingVault.setup(startTime, duration);
-
-      // Vest tokens.
-      for (let i = 0; i < 5; i++) {
-        const amount = ethers.parseEther((Math.random() * 1000000).toString());
-        amounts.push(amount);
-        await sifa.approve(vestingVault, amount);
-        await vestingVault.vest(accounts[i], amount);
-      }
-
-      // Burn remaining.
-      const remain = await sifa.balanceOf(accounts[0]);
-      await sifa.transfer("0x000000000000000000000000000000000000dEaD", remain);
-      expect(await sifa.balanceOf(accounts[0])).equals(0);
-
-      const start = await vestingVault.start();
-      let currentTime = Number(start);
-      const end = Number(await vestingVault.end());
-
-      // Release by portion.
-      while (currentTime < end) {
-        const timeDiff = Math.floor(Math.random() * 60 * 60) + 1800;
-        currentTime = (await time.latest()) + timeDiff;
-        await time.increaseTo(currentTime);
-
-        for (let i = 0; i < 5; i++) {
-          await expect(vestingVault.connect(accounts[i]).release()).to.emit(
-            vestingVault,
-            "Released"
-          );
-        }
-      }
-
-      // Check balances.
-      for (let i = 0; i < 5; i++) {
-        expect(await sifa.balanceOf(accounts[i])).equals(amounts[i]);
-      }
     });
   });
 });
