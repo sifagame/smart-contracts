@@ -1,11 +1,11 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
-import { deploySifaToken } from "./helpers";
+import { deployAll } from "./helpers";
 
 describe("SifaToken", function () {
   describe("Deployment", function () {
     it("Should have correct owner, name and supply", async function () {
-      const { sifa, owner } = await loadFixture(deploySifaToken);
+      const { sifa, owner } = await loadFixture(deployAll);
 
       expect(await sifa.owner()).to.equal(owner);
       expect(await sifa.name()).to.equal("sifa.game");

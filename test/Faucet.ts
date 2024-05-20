@@ -1,6 +1,6 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployFaucet, deploySifaToken } from "./helpers";
+import { deployAll } from "./helpers";
 
 import { expect } from "chai";
 import { ethers } from "hardhat";
@@ -8,7 +8,7 @@ import { ethers } from "hardhat";
 describe("Faucet", () => {
   describe("Construct", () => {
     it("Should deploy", async () => {
-      const { sifa } = await loadFixture(deploySifaToken);
+      const { sifa } = await loadFixture(deployAll);
       const Faucet = await ethers.getContractFactory("Faucet");
       const faucet = await Faucet.deploy(sifa, 420, 60);
 
@@ -20,7 +20,7 @@ describe("Faucet", () => {
 
   describe("Drop", () => {
     it("Should drop with schedule", async () => {
-      const { faucet, sifa, otherAccount } = await loadFixture(deployFaucet);
+      const { faucet, sifa, otherAccount } = await loadFixture(deployAll);
 
       sifa.transfer(faucet, ethers.parseEther("1000000"));
 
