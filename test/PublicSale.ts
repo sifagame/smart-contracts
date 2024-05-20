@@ -1,5 +1,6 @@
 import {
   loadFixture,
+  setBalance,
   time,
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
@@ -189,7 +190,7 @@ describe("Public Sale", () => {
 
   describe("Finalize", () => {
     it("Should finalize", async () => {
-      const { sale, sifa } = await loadFixture(deployAll);
+      const { sale, sifa, vestingVault } = await loadFixture(deployAll);
       const [owner, account1, account2, account3] = await ethers.getSigners();
 
       await sifa.transfer(sale, ethers.parseEther("3000000"));
@@ -211,6 +212,49 @@ describe("Public Sale", () => {
         to: sale,
         value: ethers.parseEther("0.3"),
       });
+
+      await time.increaseTo((await sale.end()) + 1n);
+
+      await expect(sale.finalize()).to.emit(sale, "Finalized");
+
+      const start = await sale.vestingCliff();
+      const duration = await sale.vestingDuraion();
+
+      expect(await vestingVault.vested(account1)).equals(
+        ethers.parseEther("200000")
+      );
+      expect(await vestingVault.start(account1)).equals(start);
+      expect(await vestingVault.end(account1)).equals(start + duration);
+      expect(await vestingVault.vested(account2)).equals(
+        ethers.parseEther("400000")
+      );
+      expect(await vestingVault.vested(account3)).equals(
+        ethers.parseEther("600000")
+      );
+
+      // owner receives ETH back
+      expect(await ethers.provider.getBalance(owner)).greaterThan(
+        ethers.parseEther("10000")
+      );
+    });
+
+    it("Simulate more sales", async () => {
+      const buyers = await ethers.getSigners();
+      const { sale, sifa, vestingVault } = await loadFixture(deployAll);
+
+      await sifa.transfer(sale, ethers.parseEther("200000000"));
+      await time.increaseTo((await sale.start()) + 1n);
+
+      for (let i = 0; i < buyers.length; i++) {
+        const buyer = buyers[i];
+        const amount = ethers.parseEther(
+          (Math.random() * 0.7 + 0.2).toString()
+        );
+        await buyer.sendTransaction({
+          to: sale,
+          value: amount,
+        });
+      }
 
       await time.increaseTo((await sale.end()) + 1n);
 
