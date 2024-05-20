@@ -8,6 +8,7 @@ import FaucetModule from "../ignition/modules/Faucet";
 import VaultModule from "../ignition/modules/Vault";
 import EmitterModule from "../ignition/modules/Emitter";
 import VestingVaultModule from "../ignition/modules/VestingVault";
+import PublicSaleModule from "../ignition/modules/PublicSale";
 
 const shouldVerify = () =>
   ["testnet", "mainnet"].includes(process.env.ENV || "");
@@ -164,6 +165,65 @@ async function main() {
       );
     }
   }
+
+  const [saleOwner] = await ethers.getSigners();
+  const { publicSale } = await ignition.deploy(PublicSaleModule, {
+    parameters: {
+      PublicSale: {
+        owner: await saleOwner.getAddress(),
+        token: tokenAddress,
+        emitter: emitterAddress,
+        vesting: vestingAddress,
+        factory: config.PublicSale.factory,
+        price: ethers.parseEther(config.PublicSale.price.toString()),
+        minSale: ethers.parseEther(config.PublicSale.minSale.toString()),
+        maxSale: ethers.parseEther(config.PublicSale.maxSale.toString()),
+        start: config.PublicSale.start,
+        duration: config.PublicSale.duration,
+        vestingCliff: config.PublicSale.vestingCliff,
+        vestingDuration: config.PublicSale.vestingDuration,
+      },
+    },
+  });
+  const publicSaleAddress = await publicSale.getAddress();
+  console.log(
+    `Sale: ${publicSaleAddress} starts ${
+      new Date(Number(await publicSale.start()) * 1000)
+        .toLocaleString()
+        .split(",")[0]
+    } ends ${
+      new Date(Number(await publicSale.end()) * 1000)
+        .toLocaleString()
+        .split(",")[0]
+    }`
+  );
+  if (shouldVerify()) {
+    await run("verify:verify", {
+      address: publicSaleAddress,
+      constructorArguments: [
+        await saleOwner.getAddress(),
+        tokenAddress,
+        emitterAddress,
+        vestingAddress,
+        config.PublicSale.factory,
+        ethers.parseEther(config.PublicSale.price.toString()),
+        ethers.parseEther(config.PublicSale.minSale.toString()),
+        ethers.parseEther(config.PublicSale.maxSale.toString()),
+        config.PublicSale.start,
+        config.PublicSale.duration,
+        config.PublicSale.vestingCliff,
+        config.PublicSale.vestingDuration,
+      ],
+    })
+      .then(console.log)
+      .catch(console.log);
+  }
+
+  await sifaToken.transfer(
+    publicSale,
+    ethers.parseEther(config.PublicSale.hardcap.toString())
+  );
+  console.log(`Sale hardcap ${await publicSale.hardcap()}`);
 }
 
 main().catch(console.log);
