@@ -9,13 +9,18 @@
     "amount": 800000000
   },
   "Vesting": {
-    "vest": [
-      {
-        "address": "0x000000000000000000000000000000000000dEaD",
-        "amount": 1000000,
-        "start": 1725148800,
-        "duration": 31104000
-      }
-    ]
+    "vest": []
+  },
+  "PublicSale": {
+    "price": "0.0000005",
+    "minSale": 20000,
+    "maxSale": 2000000,
+    "hardcap": 188000000,
+    "start": 1725148800,
+    "duration": 86400,
+    "vestingCliff": 1725148800,
+    "vestingDuration": 3600,
+    "weth": "",
+    "factory": "0x248AB79Bbb9bC29bB72f7Cd42F17e054Fc40188e"
   }
 }

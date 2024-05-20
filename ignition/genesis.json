@@ -17,5 +17,17 @@
         "duration": 31104000
       }
     ]
+  },
+  "PublicSale": {
+    "price": "0.0000005",
+    "minSale": 20000,
+    "maxSale": 2000000,
+    "hardcap": 200000000,
+    "start": 1725148800,
+    "duration": 86400,
+    "vestingCliff": 1725148800,
+    "vestingDuration": 3600,
+    "weth": "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
+    "factory": "0x1F98431c8aD98523631AE4a59f267346ea31F984"
   }
 }
