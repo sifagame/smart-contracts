@@ -6,6 +6,37 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Context} from "@openzeppelin/contracts/utils/Context.sol";
 
+interface IVestingVault {
+    event Released(uint256 amount, address to);
+    event Vested(uint256 amount, address to, uint64 start, uint64 duration);
+
+    function start(address vester) external view returns (uint256);
+
+    function duration(address vester) external view returns (uint256);
+
+    function end(address vester) external view returns (uint256);
+
+    function released(address to) external view returns (uint256);
+
+    function releasable(address to) external view returns (uint256);
+
+    function vested(address to) external view returns (uint256);
+
+    function vest(
+        address to,
+        uint256 amount,
+        uint64 start_,
+        uint64 duration_
+    ) external;
+
+    function release() external;
+
+    function vestedAmount(
+        address to,
+        uint64 timestamp
+    ) external view returns (uint256);
+}
+
 contract VestingVault is Context, ReentrancyGuard {
     error VestingVaultZeroDuration();
     error VestingVaultStartInPast();

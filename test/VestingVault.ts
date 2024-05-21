@@ -1,22 +1,20 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
-import { deployVestingVault } from "./helpers";
+import { deployAll } from "./helpers";
 import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 describe("Vesting Vault", () => {
   describe("Deployment", () => {
     it("Should deploy", async () => {
-      const { vestingVault, sifa } = await loadFixture(deployVestingVault);
+      const { vestingVault, sifa } = await loadFixture(deployAll);
       expect(await vestingVault.token()).equals(sifa);
     });
   });
 
   describe("Vest", () => {
     it("Should vest", async () => {
-      const { vestingVault, sifa, owner } = await loadFixture(
-        deployVestingVault
-      );
+      const { vestingVault, sifa, owner } = await loadFixture(deployAll);
       const start = (await time.latest()) + 100;
       const duration = 420;
       await sifa.approve(vestingVault, 100);
@@ -27,9 +25,7 @@ describe("Vesting Vault", () => {
     });
 
     it("Should ignore start adn duration after first vesting", async () => {
-      const { vestingVault, sifa, owner } = await loadFixture(
-        deployVestingVault
-      );
+      const { vestingVault, sifa, owner } = await loadFixture(deployAll);
       const start = (await time.latest()) + 100;
       const duration = 420;
       await sifa.approve(vestingVault, 1000);
@@ -50,7 +46,7 @@ describe("Vesting Vault", () => {
 
   describe("Schedules", () => {
     it("Should make 1 token per second available", async () => {
-      const { vestingVault, sifa } = await loadFixture(deployVestingVault);
+      const { vestingVault, sifa } = await loadFixture(deployAll);
       const [_, account1] = await ethers.getSigners();
 
       const amount = ethers.parseEther("1000");
@@ -80,9 +76,7 @@ describe("Vesting Vault", () => {
     });
 
     it("Should protect the cliff", async () => {
-      const { vestingVault, sifa, owner } = await loadFixture(
-        deployVestingVault
-      );
+      const { vestingVault, sifa, owner } = await loadFixture(deployAll);
       const start = (await time.latest()) + 100;
       const duration = 420;
 
@@ -101,7 +95,7 @@ describe("Vesting Vault", () => {
     });
 
     it("Should release tokens with time", async () => {
-      const { vestingVault, sifa } = await loadFixture(deployVestingVault);
+      const { vestingVault, sifa } = await loadFixture(deployAll);
       const [_, account1] = await ethers.getSigners();
 
       const amount = ethers.parseEther("1000");
