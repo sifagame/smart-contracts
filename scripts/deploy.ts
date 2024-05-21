@@ -170,18 +170,26 @@ async function main() {
   const { publicSale } = await ignition.deploy(PublicSaleModule, {
     parameters: {
       PublicSale: {
-        owner: await saleOwner.getAddress(),
-        token: tokenAddress,
-        emitter: emitterAddress,
-        vesting: vestingAddress,
-        factory: config.PublicSale.factory,
-        price: ethers.parseEther(config.PublicSale.price.toString()),
-        minSale: ethers.parseEther(config.PublicSale.minSale.toString()),
-        maxSale: ethers.parseEther(config.PublicSale.maxSale.toString()),
-        start: config.PublicSale.start,
-        duration: config.PublicSale.duration,
-        vestingCliff: config.PublicSale.vestingCliff,
-        vestingDuration: config.PublicSale.vestingDuration,
+        initialOwner_: await saleOwner.getAddress(),
+        contracts_: {
+          token: tokenAddress,
+          emitter: emitterAddress,
+          vesting: vestingAddress,
+          factory: config.PublicSale.factory,
+          pool: ethers.ZeroAddress,
+          weth: config.PublicSale.weth,
+        },
+        priceSettings_: {
+          price: ethers.parseEther(config.PublicSale.price.toString()),
+          minSale: ethers.parseEther(config.PublicSale.minSale.toString()),
+          maxSale: ethers.parseEther(config.PublicSale.maxSale.toString()),
+        },
+        dateSettings_: {
+          start: config.PublicSale.start,
+          duration: config.PublicSale.duration,
+          vestingCliff: config.PublicSale.vestingCliff,
+          vestingDuration: config.PublicSale.vestingDuration,
+        },
       },
     },
   });

@@ -24,7 +24,20 @@ export async function deployAll() {
     60 * 60 * 24
   );
 
-  const uniswapFactory = config.PublicSale.factory;
+  const {
+    abi: factoryAbi,
+    bytecode: factoryBytecode,
+  } = require("@uniswap/v3-core/artifacts/contracts/UniswapV3Factory.sol/UniswapV3Factory.json");
+  const UniswapFactory = await ethers.getContractFactory(
+    factoryAbi,
+    factoryBytecode,
+    owner
+  );
+  const uniswapFactory = await UniswapFactory.deploy();
+
+  const pool = ethers.ZeroAddress;
+  const WETH = ethers.ZeroAddress;
+
   const price = ethers.parseEther(config.PublicSale.price.toString());
   const minSale = ethers.parseEther(config.PublicSale.minSale.toString());
   const maxSale = ethers.parseEther(config.PublicSale.maxSale.toString());
@@ -36,17 +49,16 @@ export async function deployAll() {
   const PublicSale = await ethers.getContractFactory("PublicSale");
   const sale = await PublicSale.deploy(
     owner,
-    sifa,
-    emitter,
-    vestingVault,
-    uniswapFactory,
-    price,
-    minSale,
-    maxSale,
-    start,
-    duration,
-    vestingCliff,
-    vestingDuration
+    {
+      token: sifa,
+      emitter: emitter,
+      vesting: vestingVault,
+      factory: uniswapFactory,
+      pool: pool,
+      weth: WETH,
+    },
+    { price, minSale, maxSale },
+    { start, duration, vestingCliff, vestingDuration }
   );
 
   return {

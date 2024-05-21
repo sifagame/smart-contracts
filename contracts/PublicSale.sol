@@ -6,6 +6,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IUniswapV3Factory} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IWETH} from "@uniswap/swap-router-contracts/contracts/interfaces/IWETH.sol";
 import {IEmitter} from "./Emitter.sol";
 import {IVestingVault} from "./VestingVault.sol";
 
@@ -15,65 +16,107 @@ contract PublicSale is Ownable {
     event Sold(uint256 amount, address to);
     event Finalized();
 
-    ERC20 public immutable token;
-    IEmitter public immutable emitter;
-    IVestingVault public immutable vesting;
-    IUniswapV3Factory public immutable factory;
+    struct Contracts {
+        address token;
+        address emitter;
+        address vesting;
+        address factory;
+        address pool;
+        address weth;
+    }
 
-    uint256 public immutable price;
-    uint256 public immutable minSale;
-    uint256 public immutable maxSale;
-    uint64 public immutable vestingCliff;
-    uint64 public immutable vestingDuraion;
+    struct PriceSettings {
+        uint256 price;
+        uint256 minSale;
+        uint256 maxSale;
+    }
+
+    struct DateSettings {
+        uint64 start;
+        uint64 duration;
+        uint64 vestingCliff;
+        uint64 vestingDuration;
+    }
+
+    Contracts private _contracts;
+    PriceSettings private _priceSettings;
+    DateSettings private _dateSettings;
+
     uint8 private immutable _underlyingDecimals;
+
     uint256 public sold;
-    IUniswapV3Pool public pool;
     bool public finalized;
 
-    uint64 private immutable _start;
-    uint64 private immutable _duration;
     mapping(address => uint256) private _balances;
     mapping(address => bool) private _buyerExists;
     address[] private _buyers;
 
     constructor(
         address initialOwner_,
-        address token_,
-        address emitter_,
-        address vesting_,
-        address factory_,
-        uint256 price_,
-        uint256 minSale_,
-        uint256 maxSale_,
-        uint64 start_,
-        uint64 duration_,
-        uint64 vestingCliff_,
-        uint64 vestingDuraion_
+        Contracts memory contracts_,
+        PriceSettings memory priceSettings_,
+        DateSettings memory dateSettings_
     ) Ownable(initialOwner_) {
-        token = ERC20(token_);
-        emitter = IEmitter(emitter_);
-        vesting = IVestingVault(vesting_);
-        factory = IUniswapV3Factory(factory_);
-        price = price_;
-        minSale = minSale_;
-        maxSale = maxSale_;
-        _start = start_;
-        _duration = duration_;
-        vestingCliff = vestingCliff_;
-        vestingDuraion = vestingDuraion_;
-        _underlyingDecimals = token.decimals();
+        _contracts = contracts_;
+        _priceSettings = priceSettings_;
+        _dateSettings = dateSettings_;
+        _underlyingDecimals = ERC20(_contracts.token).decimals();
     }
 
-    /**
-     * Receive ETH and perform the sale
-     */
-    receive() external payable {
-        require(block.timestamp >= start(), "Sale not started");
-        require(block.timestamp <= end(), "Sale ended");
-        uint256 amount = tokensPerEth(msg.value);
-        require(amount >= minSale, "Less than min");
-        require(amount <= maxSale, "More than max");
-        _sale(msg.sender, amount);
+    function token() public view returns (address) {
+        return _contracts.token;
+    }
+
+    function emitter() public view returns (address) {
+        return _contracts.emitter;
+    }
+
+    function vesting() public view returns (address) {
+        return _contracts.vesting;
+    }
+
+    function factory() public view returns (address) {
+        return _contracts.factory;
+    }
+
+    function pool() public view returns (address) {
+        return _contracts.pool;
+    }
+
+    function weth() public view returns (address) {
+        return _contracts.weth;
+    }
+
+    function start() public view returns (uint64) {
+        return _dateSettings.start;
+    }
+
+    function duration() public view returns (uint64) {
+        return _dateSettings.duration;
+    }
+
+    function end() public view returns (uint64) {
+        return start() + duration();
+    }
+
+    function vestingCliff() public view returns (uint64) {
+        return _dateSettings.vestingCliff;
+    }
+
+    function vestingDuration() public view returns (uint64) {
+        return _dateSettings.vestingDuration;
+    }
+
+    function price() public view returns (uint256) {
+        return _priceSettings.price;
+    }
+
+    function minSale() public view returns (uint256) {
+        return _priceSettings.minSale;
+    }
+
+    function maxSale() public view returns (uint256) {
+        return _priceSettings.maxSale;
     }
 
     function balanceOf(address buyer) public view returns (uint256) {
@@ -84,28 +127,28 @@ contract PublicSale is Ownable {
         return _buyerExists[buyer];
     }
 
-    function start() public view returns (uint64) {
-        return _start;
-    }
-
-    function duration() public view returns (uint64) {
-        return _duration;
-    }
-
-    function end() public view returns (uint64) {
-        return start() + duration();
-    }
-
     function hardcap() public view returns (uint256) {
-        return token.balanceOf(address(this));
+        return ERC20(_contracts.token).balanceOf(address(this));
     }
 
     function tokensPerEth(uint256 eth) public view returns (uint256) {
-        return (eth * (10 ** _underlyingDecimals)) / price;
+        return (eth * (10 ** _underlyingDecimals)) / price();
     }
 
     function ethPerTokens(uint256 tokens) public view returns (uint256) {
-        return (tokens * price) / (10 ** _underlyingDecimals);
+        return (tokens * price()) / (10 ** _underlyingDecimals);
+    }
+
+    /**
+     * Receive ETH and perform the sale
+     */
+    receive() external payable {
+        require(block.timestamp >= start(), "Sale not started");
+        require(block.timestamp <= end(), "Sale ended");
+        uint256 amount = tokensPerEth(msg.value);
+        require(amount >= minSale(), "Less than min");
+        require(amount <= maxSale(), "More than max");
+        _sale(msg.sender, amount);
     }
 
     function finalize() external onlyOwner {
@@ -125,7 +168,7 @@ contract PublicSale is Ownable {
     function _sale(address to, uint256 amount) private returns (bool) {
         _balances[to] += amount;
         sold += amount;
-        require(_balances[to] <= maxSale, "Total more then max");
+        require(_balances[to] <= maxSale(), "Total more then max");
         require(sold <= hardcap(), "Exceeds hardcap");
         if (!_buyerExists[to]) {
             _buyerExists[to] = true;
@@ -136,20 +179,21 @@ contract PublicSale is Ownable {
     }
 
     function _vestAll() private {
-        token.approve(address(vesting), sold);
+        ERC20(token()).approve(vesting(), sold);
         for (uint i = 0; i < _buyers.length; i++) {
-            vesting.vest(
+            IVestingVault(_contracts.vesting).vest(
                 address(_buyers[i]),
                 _balances[_buyers[i]],
-                vestingCliff,
-                vestingDuraion
+                vestingCliff(),
+                vestingDuration()
             );
         }
     }
 
     function _emit() private {
-        token.approve(address(emitter), token.balanceOf(address(this)));
-        emitter.fill(token.balanceOf(address(this)));
+        uint256 balance = ERC20(token()).balanceOf(address(this));
+        ERC20(token()).approve(emitter(), balance);
+        IEmitter(emitter()).fill(balance);
     }
 
     function _dex() private {}

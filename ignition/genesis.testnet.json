@@ -20,7 +20,7 @@
     "duration": 86400,
     "vestingCliff": 1725148800,
     "vestingDuration": 3600,
-    "weth": "",
+    "weth": "0x0000000000000000000000000000000000000000",
     "factory": "0x248AB79Bbb9bC29bB72f7Cd42F17e054Fc40188e"
   }
 }

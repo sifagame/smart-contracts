@@ -1,6 +1,5 @@
 import {
   loadFixture,
-  setBalance,
   time,
 } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { expect } from "chai";
@@ -25,6 +24,9 @@ describe("Public Sale", () => {
       const Emitter = await ethers.getContractFactory("Emitter");
       const emitter = await Emitter.deploy(owner, sifa, vault);
 
+      const pool = ethers.ZeroAddress;
+      const WETH = ethers.ZeroAddress;
+
       const uniswapFactory = config.PublicSale.factory;
       const price = ethers.parseEther("0.000005");
       const minSale = ethers.parseEther((Math.random() * 100).toString());
@@ -37,17 +39,16 @@ describe("Public Sale", () => {
       const PublicSale = await ethers.getContractFactory("PublicSale");
       const sale = await PublicSale.deploy(
         owner,
-        sifa,
-        emitter,
-        vestingVault,
-        uniswapFactory,
-        price,
-        minSale,
-        maxSale,
-        start,
-        duration,
-        cliff,
-        vestDuration
+        {
+          token: sifa,
+          emitter: emitter,
+          vesting: vestingVault,
+          factory: uniswapFactory,
+          pool: pool,
+          weth: WETH,
+        },
+        { price, minSale, maxSale },
+        { start, duration, vestingCliff: cliff, vestingDuration: vestDuration }
       );
 
       expect(await sale.token()).equals(sifa);
@@ -61,7 +62,7 @@ describe("Public Sale", () => {
       expect(await sale.duration()).equals(duration);
       expect(await sale.end()).equals(start + duration);
       expect(await sale.vestingCliff()).equals(cliff);
-      expect(await sale.vestingDuraion()).equals(vestDuration);
+      expect(await sale.vestingDuration()).equals(vestDuration);
     });
   });
 
@@ -218,7 +219,7 @@ describe("Public Sale", () => {
       await expect(sale.finalize()).to.emit(sale, "Finalized");
 
       const start = await sale.vestingCliff();
-      const duration = await sale.vestingDuraion();
+      const duration = await sale.vestingDuration();
 
       expect(await vestingVault.vested(account1)).equals(
         ethers.parseEther("200000")
