@@ -63,8 +63,11 @@ async function main() {
   }
 
   // Deploy vault.
+  const [vaultOwner] = await ethers.getSigners();
   const { vault } = await ignition.deploy(VaultModule, {
-    parameters: { Vault: { token: tokenAddress } },
+    parameters: {
+      Vault: { token: tokenAddress, owner: await vaultOwner.getAddress() },
+    },
   });
 
   const vaultAddress = await vault.getAddress();
@@ -117,9 +120,12 @@ async function main() {
   const emitterAmount = config.Emitter.amount.toString();
   await sifaToken.approve(emitterAddress, ethers.parseEther(emitterAmount));
   await emitter.fill(ethers.parseEther(emitterAmount));
-  await emitter.start();
+
   // No ownership after start.
   await emitter.renounceOwnership();
+
+  // Link vault to emitter.
+  await vault.connect(vaultOwner).updateEmitter(emitterAddress);
 
   // Deploy Vesting Vault.
   const [vestingOwner] = await ethers.getSigners();
