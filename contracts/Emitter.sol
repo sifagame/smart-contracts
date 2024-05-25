@@ -5,11 +5,13 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {EmissionRates} from "./EmissionRates.sol";
+import {Vault} from "./Vault.sol";
 
 interface IEmitter {
     event Filled(address from, uint256 amount);
     event Started(address by);
     event Withdrawn(address by, address to, uint256 amount);
+	event VaultIsEmpty();
 
     /// @return current epoch number
     function epoch() external view returns (uint256);
@@ -163,6 +165,10 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         require(started != 0, "Not started");
         uint256 amount = this.available();
         require(amount > 0, "Nothing to unlock");
+		if (Vault(vault).totalSupply() <= 0) {
+			emit VaultIsEmpty();
+			return false;
+		}
         released += amount;
         locked -= amount;
         lastWithrawalAt = block.timestamp;
