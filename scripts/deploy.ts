@@ -96,7 +96,7 @@ async function main() {
       Emitter: {
         owner: await emitterOwner.getAddress(),
         token: tokenAddress,
-        //vault: vaultAddress,
+        vault: vaultAddress,
       },
     },
   });
