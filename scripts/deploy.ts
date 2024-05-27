@@ -1,5 +1,5 @@
 require("dotenv").config();
-import { ethers, ignition, run } from "hardhat";
+import { ethers, ignition, run, network } from "hardhat";
 import "@nomicfoundation/hardhat-verify";
 
 import config from "../ignition/loadConfig";
@@ -9,10 +9,18 @@ import VaultModule from "../ignition/modules/Vault";
 import EmitterModule from "../ignition/modules/Emitter";
 import VestingVaultModule from "../ignition/modules/VestingVault";
 
-const shouldVerify = () =>
-  ["testnet", "mainnet"].includes(process.env.ENV || "");
+import fs from "node:fs";
+const logFile = `.contracts-${network.name}`;
+
+const shouldVerify = () => ["testnet", "mainnet"].includes(network.name);
+const logContract = (s: string, flag: string = "a") => {
+  console.log(s);
+  fs.writeFileSync(logFile, s + "\n", { flag });
+};
 
 async function main() {
+	const now = new Date();
+  logContract(`===\n${network.name} contracts\n${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, "w");
   // Deploy the main SIFA Token
   const [sifaOwner] = await ethers.getSigners();
   const { sifaToken } = await ignition.deploy(SifaTokenModule, {
@@ -24,7 +32,8 @@ async function main() {
 
   const tokenAddress = await sifaToken.getAddress();
 
-  console.log(`SIFA: ${tokenAddress}`);
+  logContract(`SIFA: ${tokenAddress}`);
+
   if (shouldVerify()) {
     await run("verify:verify", {
       address: tokenAddress,
@@ -41,22 +50,22 @@ async function main() {
 
     const { faucet } = await ignition.deploy(FaucetModule, {
       parameters: {
-        Faucet: { token: await sifaToken.getAddress(), dropAmount, delay },
+        Faucet: { token: tokenAddress, dropAmount, delay },
       },
     });
 
-    console.log(`Faucet: ${await faucet.getAddress()}`);
+    logContract(`Faucet: ${await faucet.getAddress()}`);
     if (shouldVerify()) {
       await run("verify:verify", {
         address: await faucet.getAddress(),
-        constructorArguments: [await sifaOwner.getAddress(), dropAmount, delay],
+        constructorArguments: [tokenAddress, dropAmount, delay],
       })
         .then(console.log)
         .catch(console.log);
     }
 
     // Feed the faucet.
-    sifaToken.transfer(
+    await sifaToken.transfer(
       await faucet.getAddress(),
       ethers.parseEther(config.Faucet.totalSupply.toString())
     );
@@ -73,17 +82,17 @@ async function main() {
   const vaultAddress = await vault.getAddress();
 
   // Deposit to dead address, protect from inflation attack.
-  sifaToken.approve(vaultAddress, ethers.parseEther("1"));
-  vault.deposit(
+  await sifaToken.approve(vaultAddress, ethers.parseEther("1"));
+  await vault.deposit(
     ethers.parseEther("1"),
     "0x000000000000000000000000000000000000dEaD"
   );
 
-  console.log(`Vault: ${await vault.getAddress()}`);
+  logContract(`Vault: ${await vault.getAddress()}`);
   if (shouldVerify()) {
     await run("verify:verify", {
       address: vaultAddress,
-      constructorArguments: [tokenAddress],
+      constructorArguments: [tokenAddress, await vaultOwner.getAddress()],
     })
       .then(console.log)
       .catch(console.log);
@@ -102,14 +111,14 @@ async function main() {
   });
   const emitterAddress = await emitter.getAddress();
 
-  console.log(`Emitter: ${await emitter.getAddress()}`);
+  logContract(`Emitter: ${await emitter.getAddress()}`);
   if (shouldVerify()) {
     await run("verify:verify", {
       address: await emitter.getAddress(),
       constructorArguments: [
+        await emitterOwner.getAddress(),
         tokenAddress,
         vaultAddress,
-        await emitterOwner.getAddress(),
       ],
     })
       .then(console.log)
@@ -121,14 +130,10 @@ async function main() {
   await sifaToken.approve(emitterAddress, ethers.parseEther(emitterAmount));
   await emitter.fill(ethers.parseEther(emitterAmount));
 
-  // No ownership after start.
-  await emitter.renounceOwnership();
-
   // Link vault to emitter.
-  await vault.connect(vaultOwner).updateEmitter(emitterAddress);
+  await vault.updateEmitter(emitterAddress);
 
   // Deploy Vesting Vault.
-  const [vestingOwner] = await ethers.getSigners();
   const { vestingVault } = await ignition.deploy(VestingVaultModule, {
     parameters: {
       VestingVault: {
@@ -137,11 +142,11 @@ async function main() {
     },
   });
   const vestingAddress = await vestingVault.getAddress();
-  console.log(`Vesting: ${vestingAddress}`);
+  logContract(`Vesting: ${vestingAddress}`);
   if (shouldVerify()) {
     await run("verify:verify", {
       address: vestingAddress,
-      constructorArguments: [await vestingOwner.getAddress(), tokenAddress],
+      constructorArguments: [tokenAddress],
     })
       .then(console.log)
       .catch(console.log);

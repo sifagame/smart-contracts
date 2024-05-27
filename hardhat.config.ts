@@ -28,6 +28,9 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: process.env.ARBISCAN_API_KEY,
   },
+  ignition: {
+    requiredConfirmations: 5,
+  },
 };
 
 export default config;
