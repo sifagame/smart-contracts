@@ -19,7 +19,8 @@ const logContract = (s: string, flag: string = "a") => {
 };
 
 async function main() {
-  logContract(`===\n${network.name} contracts\n${new Date()}`, "w");
+	const now = new Date();
+  logContract(`===\n${network.name} contracts\n${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, "w");
   // Deploy the main SIFA Token
   const [sifaOwner] = await ethers.getSigners();
   const { sifaToken } = await ignition.deploy(SifaTokenModule, {
