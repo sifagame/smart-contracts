@@ -1,6 +1,6 @@
 import { loadFixture } from "@nomicfoundation/hardhat-toolbox/network-helpers";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
-import { deployEmitter } from "./helpers";
+import { deployEmitter, initializeEmitterVaultConnection } from "./helpers";
 
 import { expect } from "chai";
 import { ethers } from "hardhat";
@@ -163,12 +163,8 @@ describe("Emitter", function () {
     });
 
     it("Should return 0 if empty", async () => {
-      const { emitter, sifa } = await loadFixture(deployEmitter);
+      const { emitter } = await initializeEmitterVaultConnection(800000000, 1);
       const epochLength = await emitter.epochLength();
-      const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
-      await emitter.start();
 
       // Assert we wait 1000 months, should withdraw all 800M.
       await time.increase(epochLength * 1000n);
@@ -323,29 +319,25 @@ describe("Emitter", function () {
     });
 
     it("Should withdraw in first epoch", async () => {
-      const { emitter, vault, sifa, owner } = await loadFixture(deployEmitter);
+      const { emitter, vault, sifa, owner } =
+        await initializeEmitterVaultConnection(1000, 1);
       const rate = await emitter.rate();
+      const started = await emitter.lastWithrawalAt();
 
-      const amount = ethers.parseEther("1000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
-      await emitter.start();
-
-      await time.increase(42);
+      await time.increaseTo(started + 42n);
+      // 43 because +1 second.
       await expect(emitter.withdraw())
         .to.emit(emitter, "Withdrawn")
         .withArgs(owner, vault, rate * 43n);
 
-      expect(await sifa.balanceOf(vault)).equals(rate * 43n);
+      // 43 * 10 + 1 (was deposited during init)
+      expect(await sifa.balanceOf(vault)).equals(ethers.parseEther("431"));
     });
 
     it("Should revert if empty", async () => {
-      const { emitter, sifa } = await loadFixture(deployEmitter);
+      const { emitter, vault, sifa, owner } =
+        await initializeEmitterVaultConnection(1000, 1);
       const epochLength = await emitter.epochLength();
-      const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
-      await emitter.start();
 
       // Assert we wait 1000 months, should withdraw all 800M.
       await time.increase(epochLength * 1000n);
@@ -355,49 +347,43 @@ describe("Emitter", function () {
     });
 
     it("Should withdraw in exact epoch", async () => {
-      const { emitter, sifa, vault, owner } = await loadFixture(deployEmitter);
+      const { emitter, vault, sifa, owner } =
+        await initializeEmitterVaultConnection(800000000, 1);
       const epochLength = await emitter.epochLength();
-      const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
-      await emitter.start();
+      const started = await emitter.lastWithrawalAt();
 
-      await time.increase(epochLength - 1n);
+      await time.increaseTo(started + epochLength - 1n);
       await expect(emitter.withdraw())
         .to.emit(emitter, "Withdrawn")
         .withArgs(owner, vault, ethers.parseEther("25920000"));
 
-      expect(await sifa.balanceOf(vault)).equals(ethers.parseEther("25920000"));
+      expect(await sifa.balanceOf(vault)).equals(ethers.parseEther("25920001"));
     });
 
     it("Should withdraw across epochs", async () => {
-      const { emitter, sifa, vault, owner } = await loadFixture(deployEmitter);
+      const { emitter, vault, sifa, owner } =
+        await initializeEmitterVaultConnection(800000000, 1);
       const epochLength = await emitter.epochLength();
-      const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
-      await emitter.start();
+      const started = await emitter.lastWithrawalAt();
 
-      await time.increase(epochLength + 1n);
+      await time.increaseTo(started + epochLength + 1n);
       await expect(emitter.withdraw())
         .to.emit(emitter, "Withdrawn")
         // 25920000 from the epoch0 plus 2 ticks from epoch1
         .withArgs(owner, vault, ethers.parseEther("25920019.36520303123264"));
 
       expect(await sifa.balanceOf(vault)).equals(
-        ethers.parseEther("25920019.36520303123264")
+        ethers.parseEther("25920020.36520303123264")
       );
     });
 
     it("Should withdraw a small portion after last epoch, vault has full emission", async () => {
-      const { emitter, sifa, vault } = await loadFixture(deployEmitter);
+      const { emitter, vault, sifa, owner } =
+        await initializeEmitterVaultConnection(800000000, 1);
       const epochLength = await emitter.epochLength();
-      const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
-      await emitter.start();
+      const started = await emitter.lastWithrawalAt();
 
-      await time.increase(epochLength * 120n);
+      await time.increaseTo(started + epochLength * 120n);
 
       await emitter.withdraw();
 
@@ -406,28 +392,25 @@ describe("Emitter", function () {
       await expect(emitter.withdraw()).to.emit(emitter, "Withdrawn");
 
       expect(await sifa.balanceOf(vault)).equals(
-        ethers.parseEther("800000000")
+        ethers.parseEther("800000001")
       );
     });
 
     it("Should perform multiple withdrawals across random time", async () => {
-      const { emitter, sifa, vault } = await loadFixture(deployEmitter);
+      const { emitter, vault, sifa, owner } =
+        await initializeEmitterVaultConnection(800000000, 1);
       const epochLength = await emitter.epochLength();
-      const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
-      await emitter.start();
 
       await time.increase(100);
 
       while ((await emitter.available()) > 0) {
         await expect(emitter.withdraw()).to.emit(emitter, "Withdrawn");
-		const addTime = Math.floor(Math.random() * Number(epochLength));
-		await time.increase(addTime);
+        const addTime = Math.floor(Math.random() * Number(epochLength));
+        await time.increase(addTime);
       }
 
       expect(await sifa.balanceOf(vault)).equals(
-        ethers.parseEther("800000000")
+        ethers.parseEther("800000001")
       );
     });
   });
