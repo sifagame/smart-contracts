@@ -11,6 +11,7 @@ import VestingVaultModule from "../ignition/modules/VestingVault";
 
 import fs from "node:fs";
 const logFile = `.contracts-${network.name}`;
+const contractsFile = logFile + ".json";
 
 const shouldVerify = () => ["testnet", "mainnet"].includes(network.name);
 const logContract = (s: string, flag: string = "a") => {
@@ -18,9 +19,32 @@ const logContract = (s: string, flag: string = "a") => {
   fs.writeFileSync(logFile, s + "\n", { flag });
 };
 
+const updateContractsJson = () => {
+  console.log("Updating contracts JSON");
+  const contracts: { [index: string]: string } = {};
+  fs.readFile(logFile, (err, data) => {
+    if (err) throw err;
+    data
+      .toString()
+      .split("\n")
+      .map((l) => {
+        const [name, address] = l.split(": ");
+        if (typeof name !== "undefined" && typeof address !== "undefined") {
+          contracts[name] = address;
+        }
+      });
+    fs.writeFileSync(contractsFile, JSON.stringify(contracts, null, 2));
+  });
+};
+
 async function main() {
-	const now = new Date();
-  logContract(`===\n${network.name} contracts\n${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, "w");
+  const now = new Date();
+  logContract(
+    `===\n${
+      network.name
+    } contracts\n${now.toLocaleDateString()} ${now.toLocaleTimeString()}`,
+    "w"
+  );
   // Deploy the main SIFA Token
   const [sifaOwner] = await ethers.getSigners();
   const { sifaToken } = await ignition.deploy(SifaTokenModule, {
@@ -175,6 +199,8 @@ async function main() {
       );
     }
   }
+
+  updateContractsJson();
 }
 
 main();
