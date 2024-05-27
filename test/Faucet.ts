@@ -19,13 +19,25 @@ describe("Faucet", () => {
   });
 
   describe("Drop", () => {
+    it("Require ETH", async () => {
+      const { faucet, sifa, owner } = await loadFixture(deployFaucet);
+      sifa.transfer(faucet, ethers.parseEther("1000000"));
+
+      const user = ethers.Wallet.createRandom();
+      await owner.sendTransaction({
+        to: user,
+        value: ethers.parseEther("0.0009"),
+      });
+      await expect(faucet.drop(user)).to.be.revertedWith("Own more 0.001 ETH");
+    });
+
     it("Should drop with schedule", async () => {
       const { faucet, sifa, otherAccount } = await loadFixture(deployFaucet);
 
       sifa.transfer(faucet, ethers.parseEther("1000000"));
 
       expect(await faucet.available(otherAccount)).equals(true);
-      await expect(faucet.connect(otherAccount).drop()).to.emit(
+      await expect(faucet.connect(otherAccount).drop(otherAccount)).to.emit(
         faucet,
         "Dropped"
       );
@@ -36,14 +48,14 @@ describe("Faucet", () => {
       await time.increase(100);
 
       expect(await faucet.available(otherAccount)).equals(false);
-      await expect(faucet.connect(otherAccount).drop()).to.be.revertedWith(
-        "Wait"
-      );
+      await expect(
+        faucet.connect(otherAccount).drop(otherAccount)
+      ).to.be.revertedWith("Wait");
 
       await time.increase(60 * 60 * 24);
 
       expect(await faucet.available(otherAccount)).equals(true);
-      await expect(faucet.connect(otherAccount).drop()).to.emit(
+      await expect(faucet.connect(otherAccount).drop(otherAccount)).to.emit(
         faucet,
         "Dropped"
       );

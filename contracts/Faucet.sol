@@ -8,15 +8,21 @@ import {Context} from "@openzeppelin/contracts/utils/Context.sol";
  * @dev Faucet for the Sifa Game
  */
 contract Faucet is Context {
-    address public TOKEN;
-    uint256 public DROP_AMOUNT = 10 * 10 ** 18;
-    uint256 public DELAY = 1 days;
+    address public immutable TOKEN;
+    uint256 public immutable DROP_AMOUNT = 10 * 10 ** 18;
+    uint256 public immutable DELAY = 1 days;
+    uint256 constant REQUIRE_ETH = 10 ** 15;
     mapping(address => uint256) private _availableAt;
 
     event Dropped(uint256 amount);
 
-    modifier canDrop() {
-        require(available(_msgSender()), "Wait");
+    modifier canDrop(address to) {
+        require(available(to), "Wait");
+        _;
+    }
+
+    modifier hasEth(address to) {
+        require(to.balance >= REQUIRE_ETH, "Own more 0.001 ETH");
         _;
     }
 
@@ -26,14 +32,14 @@ contract Faucet is Context {
         DELAY = delay_;
     }
 
-    function available(address from) public view returns (bool) {
-        uint256 at = _availableAt[from];
+    function available(address to) public view returns (bool) {
+        uint256 at = _availableAt[to];
         return at == 0 || at < block.timestamp;
     }
 
-    function drop() public canDrop {
-        _availableAt[_msgSender()] = block.timestamp + DELAY;
-        IERC20(TOKEN).transfer(_msgSender(), DROP_AMOUNT);
+    function drop(address to) public canDrop(to) hasEth(to) {
+        _availableAt[to] = block.timestamp + DELAY;
+        IERC20(TOKEN).transfer(to, DROP_AMOUNT);
         emit Dropped(DROP_AMOUNT);
     }
 }
