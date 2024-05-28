@@ -11,18 +11,28 @@ contract Faucet is Context {
     address public immutable TOKEN;
     uint256 public immutable DROP_AMOUNT = 10 * 10 ** 18;
     uint256 public immutable DELAY = 1 days;
-    uint256 constant REQUIRE_ETH = 10 ** 15;
+    uint256 public constant REQUIRE_ETH = 10 ** 15;
     mapping(address => uint256) private _availableAt;
 
-    event Dropped(uint256 amount);
+    event Dropped(uint256 amount, address to);
+
+    error FaucetClaimNotAvailable(address to);
+    error FaucetNotEnoughETH(address to);
+    error FaucetHasNotEnoughTokens(uint256 remain);
 
     modifier canDrop(address to) {
-        require(available(to), "Wait");
+        if (!available(to)) revert FaucetClaimNotAvailable(to);
         _;
     }
 
     modifier hasEth(address to) {
-        require(to.balance >= REQUIRE_ETH, "Own more 0.001 ETH");
+        if (to.balance < REQUIRE_ETH) revert FaucetNotEnoughETH(to);
+        _;
+    }
+
+    modifier hasTokens() {
+        uint256 remain = IERC20(TOKEN).balanceOf(address(this));
+        if (remain < DROP_AMOUNT) revert FaucetHasNotEnoughTokens(remain);
         _;
     }
 
@@ -33,13 +43,20 @@ contract Faucet is Context {
     }
 
     function available(address to) public view returns (bool) {
-        uint256 at = _availableAt[to];
-        return at == 0 || at < block.timestamp;
+        return nextClaimAt(to) <= block.timestamp;
     }
 
-    function drop(address to) public canDrop(to) hasEth(to) {
+    function nextClaimAt(address to) public view returns (uint256) {
+        return _availableAt[to];
+    }
+
+    function claim() public {
+        return drop(_msgSender());
+    }
+
+    function drop(address to) public canDrop(to) hasEth(to) hasTokens {
         _availableAt[to] = block.timestamp + DELAY;
         IERC20(TOKEN).transfer(to, DROP_AMOUNT);
-        emit Dropped(DROP_AMOUNT);
+        emit Dropped(DROP_AMOUNT, to);
     }
 }
