@@ -31,9 +31,15 @@ describe("Vault", function () {
       await vault.deposit(ethers.parseEther("1000"), owner);
       await sifa.transfer(vault, ethers.parseEther("1000"));
       const maxWithdraw = await vault.maxWithdraw(owner);
-	  await expect(vault.withdraw(maxWithdraw/2n, owner, owner)).to.not.emit(emitter, "Withdrawn");
-	  const maxRedeem = await vault.maxRedeem(owner);
-	  await expect(vault.redeem(maxRedeem, owner, owner)).to.not.emit(emitter, "Withdrawn");
+      await expect(vault.withdraw(maxWithdraw / 2n, owner, owner)).to.not.emit(
+        emitter,
+        "Withdrawn"
+      );
+      const maxRedeem = await vault.maxRedeem(owner);
+      await expect(vault.redeem(maxRedeem, owner, owner)).to.not.emit(
+        emitter,
+        "Withdrawn"
+      );
     });
 
     it("Should update emitter", async () => {
@@ -43,8 +49,10 @@ describe("Vault", function () {
     });
 
     it("Should withdraw emitter", async () => {
-      const { emitter, vault, sifa, owner } =
-        await initializeEmitterVaultConnection(800000000);
+      const { emitter, vault, sifa } = await initializeEmitterVaultConnection(
+        800000000
+      );
+      const [owner, otherAccount] = await ethers.getSigners();
       const assets = ethers.parseEther("1");
       const assetsBefore = await sifa.balanceOf(owner);
 
@@ -53,6 +61,7 @@ describe("Vault", function () {
       await expect(emitter.withdraw()).to.emit(emitter, "VaultIsEmpty");
 
       await vault.deposit(assets, owner);
+      await vault.deposit(assets, otherAccount);
 
       const maxRedeem = await vault.maxRedeem(owner);
       await expect(vault.redeem(maxRedeem, owner, owner)).to.emit(
@@ -71,6 +80,27 @@ describe("Vault", function () {
       const assetsAfter = await sifa.balanceOf(owner);
 
       expect(assetsBefore).lessThan(assetsAfter);
+    });
+
+    it("Should empty account if withdraw 100%", async () => {
+      const { emitter, vault, sifa, owner } =
+        await initializeEmitterVaultConnection(800000000);
+      const assets = ethers.parseEther("1");
+      const assetsBefore = await sifa.balanceOf(owner);
+      await vault.deposit(assets, owner);
+
+      await time.increase(100);
+      await emitter.withdraw();
+
+      const maxWithdraw = await vault.maxWithdraw(owner);
+      const maxRedeem = await vault.maxRedeem(owner);
+      await time.increase(10);
+
+      await expect(vault.withdraw(maxWithdraw, owner, owner))
+        .to.emit(vault, "Withdraw")
+        .withArgs(owner, owner, owner, maxWithdraw, maxRedeem);
+      expect(await vault.maxRedeem(owner)).equals(0);
+      expect(await vault.maxWithdraw(owner)).equals(0);
     });
 
     it("Should withdraw and redeem after emission ends", async () => {
@@ -108,11 +138,10 @@ describe("Vault", function () {
         "Withdraw"
       );
 
-	  await expect(vault.withdraw(30000000n, owner, owner)).to.emit(
+      await expect(vault.withdraw(30000000n, owner, owner)).to.emit(
         vault,
         "Withdraw"
       );
-
     });
   });
 });
