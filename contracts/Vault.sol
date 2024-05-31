@@ -27,7 +27,7 @@ contract Vault is Ownable, ERC4626 {
         address receiver,
         address owner
     ) public virtual override returns (uint256) {
-		uint256 assetsWithdrawn = super.withdraw(assets, receiver, owner);
+        uint256 assetsWithdrawn = super.withdraw(assets, receiver, owner);
         if (address(0) != emitter) {
             if (IEmitter(emitter).available() > 0) {
                 IEmitter(emitter).withdraw();
