@@ -1,8 +1,18 @@
 import { network } from "hardhat";
+import { readFileSync } from "fs";
 
-import existingLocalContracts from "../.contracts-localhost.json";
-import existingTestnetContracts from "../.contracts-testnet.json";
-import existingMainnetContracts from "../.contracts-mainnet.json";
+function readJsonFile(path: string) {
+  try {
+    const file = readFileSync(path, "utf8");
+    return JSON.parse(file);
+  } catch {
+    return {};
+  }
+}
+
+const existingLocalContracts = readJsonFile("../.contracts-localhost.json");
+const existingTestnetContracts = readJsonFile("../.contracts-testnet.json");
+const existingMainnetContracts = readJsonFile("../.contracts-mainnet.json");
 
 type ExistingContracts = {
   SIFA?: string;
