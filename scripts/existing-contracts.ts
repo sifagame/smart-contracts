@@ -10,9 +10,9 @@ function readJsonFile(path: string) {
   }
 }
 
-const existingLocalContracts = readJsonFile("../.contracts-localhost.json");
-const existingTestnetContracts = readJsonFile("../.contracts-testnet.json");
-const existingMainnetContracts = readJsonFile("../.contracts-mainnet.json");
+const existingLocalContracts = readJsonFile(".contracts-localhost.json");
+const existingTestnetContracts = readJsonFile(".contracts-testnet.json");
+const existingMainnetContracts = readJsonFile(".contracts-mainnet.json");
 
 type ExistingContracts = {
   SIFA?: string;
