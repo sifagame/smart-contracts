@@ -139,7 +139,7 @@ abstract contract EmissionRates {
         215305447128642020
     ];
 
-    function rates(uint256 _epoch) external view returns (uint256) {
+    function rates(uint8 _epoch) external view returns (uint256) {
         if (_epoch < _rates.length) {
             return _rates[_epoch];
         } else {

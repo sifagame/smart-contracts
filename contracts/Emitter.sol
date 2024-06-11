@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {EmissionRates} from "./EmissionRates.sol";
-import {Vault} from "./Vault.sol";
+import {IVault} from "./Vault.sol";
 
 interface IEmitter {
     event Filled(address from, uint256 amount);
@@ -14,17 +14,17 @@ interface IEmitter {
     event VaultIsEmpty();
 
     /// @return current epoch number
-    function epoch() external view returns (uint256);
+    function epoch() external view returns (uint8);
 
     /// @param _time -- time
     /// @return epoch number at the given time
-    function epochAt(uint256 _time) external view returns (uint256);
+    function epochAt(uint64 _time) external view returns (uint8);
 
     /// @return number of tokens being unlocked per second in the current epoch
     function rate() external view returns (uint256);
 
     /// @return emission start time
-    function started() external view returns (uint256);
+    function started() external view returns (uint64);
 
     /// @return number of locked tokens
     function locked() external view returns (uint256);
@@ -36,7 +36,7 @@ interface IEmitter {
     function available() external view returns (uint256);
 
     /// @return number of seconds since last withdrawal
-    function lastWithrawalAt() external view returns (uint256);
+    function lastWithrawalAt() external view returns (uint64);
 
     /// @dev Transfer and lock tokens from sender to the contract
     /// @param _amount -- number of tokens
@@ -53,12 +53,12 @@ interface IEmitter {
 
 contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
     IERC20 public immutable token;
-    address public immutable vault;
-    uint256 public immutable epochLength = 30 days;
-    uint256 public started;
+    IVault public immutable vault;
+    uint64 public immutable epochLength = 30 days;
+    uint64 public started;
     uint256 public released;
     uint256 public locked;
-    uint256 public lastWithrawalAt;
+    uint64 public lastWithrawalAt;
 
     constructor(
         address initialOwner_,
@@ -66,19 +66,19 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         address vault_
     ) Ownable(initialOwner_) {
         token = IERC20(token_);
-        vault = vault_;
+        vault = IVault(vault_);
     }
 
     function _epochRange(
-        uint256 _start,
-        uint256 _end
-    ) internal view returns (uint256, uint256) {
+        uint64 _start,
+        uint64 _end
+    ) internal view returns (uint8, uint8) {
         return (this.epochAt(_start), this.epochAt(_end));
     }
 
     function _epochStartEnd(
-        uint256 _epoch
-    ) internal view returns (uint256, uint256) {
+        uint8 _epoch
+    ) internal view returns (uint64, uint64) {
         return (
             started + _epoch * epochLength,
             started + (_epoch + 1) * epochLength - 1
@@ -90,14 +90,14 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
     /// @param _end -- end time
     /// @return amount of tokens to emit
     function _getEmission(
-        uint256 _start,
-        uint256 _end
+        uint64 _start,
+        uint64 _end
     ) internal view returns (uint256) {
         if (_start == _end) {
             return 0;
         }
 
-        (uint256 _firstEpoch, uint256 _lastEpoch) = _epochRange(_start, _end);
+        (uint8 _firstEpoch, uint8 _lastEpoch) = _epochRange(_start, _end);
 
         if (_firstEpoch == _lastEpoch) {
             return (_end - _start) * this.rates(_firstEpoch);
@@ -109,7 +109,7 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         (, _epochEnd) = _epochStartEnd(_firstEpoch);
         uint256 _amount = (_epochEnd + 1 - _start) * this.rates(_firstEpoch);
 
-        for (uint256 _epoch = _firstEpoch + 1; _epoch < _lastEpoch; _epoch++) {
+        for (uint8 _epoch = _firstEpoch + 1; _epoch < _lastEpoch; _epoch++) {
             (_epochStart, _epochEnd) = _epochStartEnd(_firstEpoch);
             _amount += (_epochEnd - _epochStart) * this.rates(_epoch);
         }
@@ -119,15 +119,15 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         return _amount;
     }
 
-    function epoch() external view returns (uint256) {
-        return this.epochAt(block.timestamp);
+    function epoch() external view returns (uint8) {
+        return this.epochAt(uint64(block.timestamp));
     }
 
-    function epochAt(uint256 _time) external view returns (uint256) {
+    function epochAt(uint64 _time) external view returns (uint8) {
         if (started == 0) {
             return 0;
         } else {
-            return (_time - started) / epochLength;
+            return uint8((_time - started) / epochLength);
         }
     }
 
@@ -140,7 +140,7 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
             return 0;
         }
 
-        uint256 amount = _getEmission(lastWithrawalAt, block.timestamp);
+        uint256 amount = _getEmission(lastWithrawalAt, uint64(block.timestamp));
 
         return locked > amount ? amount : locked;
     }
@@ -154,8 +154,8 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
     function start() external onlyOwner nonReentrant returns (bool) {
         require(locked > 0, "No tokens");
         require(started == 0, "Already started");
-        started = block.timestamp;
-        lastWithrawalAt = block.timestamp;
+        started = uint64(block.timestamp);
+        lastWithrawalAt = uint64(block.timestamp);
         emit Started(msg.sender);
         return true;
     }
@@ -165,15 +165,15 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         require(started != 0, "Not started");
         uint256 amount = this.available();
         require(amount > 0, "Nothing to unlock");
-        if (Vault(vault).totalSupply() <= 0) {
+        if (vault.totalSupply() <= 0) {
             emit VaultIsEmpty();
             return false;
         }
         released += amount;
         locked -= amount;
-        lastWithrawalAt = block.timestamp;
-        token.transfer(vault, amount);
-        emit Withdrawn(msg.sender, vault, amount);
+        lastWithrawalAt = uint64(block.timestamp);
+        token.transfer(address(vault), amount);
+        emit Withdrawn(msg.sender, address(vault), amount);
         return true;
     }
 }
