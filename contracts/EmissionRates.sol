@@ -16,7 +16,7 @@ pragma solidity ^0.8;
  * @notice Contains precalculated emission rated for 120 epochs to prevent complex floating point calculations
  */
 abstract contract EmissionRates {
-    uint256[120] internal _rates = [
+    uint64[120] internal _rates = [
         10000000000000000000,
         9682601515616320000,
         9375277211021540000,
