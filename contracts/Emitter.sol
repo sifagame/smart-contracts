@@ -38,10 +38,6 @@ interface IEmitter {
     /// @return number of seconds since last withdrawal
     function lastWithrawalAt() external view returns (uint64);
 
-    /// @dev Transfer and lock tokens from sender to the contract
-    /// @param _amount -- number of tokens
-    function fill(uint256 _amount) external;
-
     /// @dev Start the emission
     /// @return true if started
     function start() external returns (bool);
@@ -57,7 +53,6 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
     uint64 public immutable epochLength = 30 days;
     uint64 public started;
     uint256 public released;
-    uint256 public locked;
     uint64 public lastWithrawalAt;
 
     constructor(
@@ -131,6 +126,10 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         }
     }
 
+	function locked() external view returns (uint256) {
+		return token.balanceOf(address(this));
+	}
+
     function rate() external view returns (uint256) {
         return this.rates(this.epoch());
     }
@@ -142,17 +141,11 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
 
         uint256 amount = _getEmission(lastWithrawalAt, uint64(block.timestamp));
 
-        return locked > amount ? amount : locked;
-    }
-
-    function fill(uint256 _amount) external nonReentrant {
-        locked += _amount;
-        token.transferFrom(msg.sender, address(this), _amount);
-        emit Filled(msg.sender, _amount);
+        return this.locked() > amount ? amount : this.locked();
     }
 
     function start() external onlyOwner nonReentrant returns (bool) {
-        require(locked > 0, "No tokens");
+        require(this.locked() > 0, "No tokens");
         require(started == 0, "Already started");
         started = uint64(block.timestamp);
         lastWithrawalAt = uint64(block.timestamp);
@@ -170,7 +163,6 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
             return false;
         }
         released += amount;
-        locked -= amount;
         lastWithrawalAt = uint64(block.timestamp);
         token.transfer(address(vault), amount);
         emit Withdrawn(msg.sender, address(vault), amount);

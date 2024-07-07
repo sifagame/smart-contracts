@@ -1,3 +1,7 @@
 {
-  "SIFA": "0x6de220133b88615Ffd7c31180ba7faaD96596cC2"
+  "SIFA": "0x6de220133b88615Ffd7c31180ba7faaD96596cC2",
+  "Faucet": "",
+  "Vault": "",
+  "Emitter": "",
+  "Vesting": ""
 }

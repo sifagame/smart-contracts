@@ -9,9 +9,8 @@ export const initializeEmitterVaultConnection = async (
   await vault.updateEmitter(emitter);
   const tokens = ethers.parseEther(amount.toString());
   const max = await vault.maxDeposit(owner);
-  await sifa.approve(emitter, max);
   await sifa.approve(vault, max);
-  await emitter.fill(tokens);
+  await sifa.transfer(emitter, tokens);
   await emitter.start();
 
   if (lockToVault) {

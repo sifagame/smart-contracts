@@ -9,12 +9,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IEmitter} from "./Emitter.sol";
 
 interface IVault is IERC4626 {
-    function updateEmitter(address _emitter) external;
-}
-
-contract Vault is Ownable, ERC4626 {
     event EmitterUpdated(address emitter);
 
+}
+
+contract Vault is IVault, Ownable, ERC4626 {
     IEmitter public emitter;
 
     constructor(
@@ -31,7 +30,7 @@ contract Vault is Ownable, ERC4626 {
         uint256 assets,
         address receiver,
         address owner
-    ) public virtual override returns (uint256) {
+    ) public virtual override(ERC4626, IERC4626) returns (uint256) {
         uint256 assetsWithdrawn = super.withdraw(assets, receiver, owner);
         _maybeWithdrawEmitter();
         return assetsWithdrawn;
@@ -41,7 +40,7 @@ contract Vault is Ownable, ERC4626 {
         uint256 shares,
         address receiver,
         address owner
-    ) public virtual override returns (uint256) {
+    ) public virtual override(ERC4626, IERC4626) returns (uint256) {
         _maybeWithdrawEmitter();
         return super.redeem(shares, receiver, owner);
     }
