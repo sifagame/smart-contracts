@@ -8,9 +8,12 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IEmitter} from "./Emitter.sol";
 
-contract Vault is Ownable, ERC4626 {
+interface IVault is IERC4626 {
     event EmitterUpdated(address emitter);
 
+}
+
+contract Vault is IVault, Ownable, ERC4626 {
     IEmitter public emitter;
 
     constructor(

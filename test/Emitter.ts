@@ -39,8 +39,7 @@ describe("Emitter", function () {
       const { emitter, sifa } = await loadFixture(deployEmitter);
 
       const amount = ethers.parseEther("1000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await emitter.start();
 
       const now = await time.latest();
@@ -73,8 +72,7 @@ describe("Emitter", function () {
       const { emitter, sifa } = await loadFixture(deployEmitter);
 
       const amount = ethers.parseEther("1000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await emitter.start();
 
       expect(await emitter.epoch()).to.equal(0);
@@ -126,8 +124,7 @@ describe("Emitter", function () {
       const epochLength = await emitter.epochLength();
 
       const amount = ethers.parseEther("1000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await emitter.start();
 
       expect(await emitter.rate()).to.equal(ethers.parseEther("10"));
@@ -155,8 +152,7 @@ describe("Emitter", function () {
     it("Should return 0 if not started", async () => {
       const { emitter, sifa } = await loadFixture(deployEmitter);
       const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
 
       await time.increase(42);
       expect(await emitter.available()).equals(0);
@@ -176,8 +172,7 @@ describe("Emitter", function () {
     it("Should return 10 for 1 second", async () => {
       const { emitter, sifa } = await loadFixture(deployEmitter);
       const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await emitter.start();
 
       expect(await emitter.available()).equals(0);
@@ -188,8 +183,7 @@ describe("Emitter", function () {
     it("Should return 420 for 42 seconds", async () => {
       const { emitter, sifa } = await loadFixture(deployEmitter);
       const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await emitter.start();
 
       expect(await emitter.available()).equals(0);
@@ -204,8 +198,7 @@ describe("Emitter", function () {
       const epochRate = await emitter.rates(epoch);
 
       const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await emitter.start();
 
       expect(await emitter.available()).equals(ethers.parseEther("0"));
@@ -220,8 +213,7 @@ describe("Emitter", function () {
       const epochRate = await emitter.rates(epoch);
 
       const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await emitter.start();
 
       await time.increase(epochLength + 5n);
@@ -234,8 +226,7 @@ describe("Emitter", function () {
       const { emitter, sifa, vault, owner } = await loadFixture(deployEmitter);
       const epochLength = await emitter.epochLength();
       const amount = ethers.parseEther("800000000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await emitter.start();
 
       await time.increase(epochLength * 120n - 5n);
@@ -252,28 +243,6 @@ describe("Emitter", function () {
     });
   });
 
-  describe("Fill", () => {
-    it("Should revert if not enough tokens", async () => {
-      const { emitter, sifa } = await loadFixture(deployEmitter);
-      const amount = ethers.parseEther("1000");
-
-      await expect(emitter.fill(amount)).to.be.revertedWithCustomError(
-        sifa,
-        "ERC20InsufficientAllowance"
-      );
-    });
-
-    it("Should fill", async () => {
-      const { emitter, sifa, owner } = await loadFixture(deployEmitter);
-      const amount = ethers.parseEther("1000");
-      await sifa.approve(emitter, amount);
-      await expect(emitter.fill(amount))
-        .to.emit(emitter, "Filled")
-        .withArgs(owner, amount);
-      expect(await emitter.locked()).equals(amount);
-    });
-  });
-
   describe("Start", () => {
     it("Should not start empty", async () => {
       const { emitter } = await loadFixture(deployEmitter);
@@ -284,8 +253,7 @@ describe("Emitter", function () {
     it("Should start", async () => {
       const { emitter, sifa, owner } = await loadFixture(deployEmitter);
       const amount = ethers.parseEther("1000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
 
       await expect(emitter.start()).to.emit(emitter, "Started").withArgs(owner);
 
@@ -296,8 +264,7 @@ describe("Emitter", function () {
     it("Should not restart", async () => {
       const { emitter, sifa } = await loadFixture(deployEmitter);
       const amount = ethers.parseEther("1000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await emitter.start();
 
       const started = await emitter.started();
@@ -312,8 +279,7 @@ describe("Emitter", function () {
     it("Should revert lock not started", async () => {
       const { emitter, sifa } = await loadFixture(deployEmitter);
       const amount = ethers.parseEther("1000");
-      await sifa.approve(emitter, amount);
-      await emitter.fill(amount);
+      await sifa.transfer(emitter, amount);
       await time.increase(100);
       await expect(emitter.withdraw()).to.be.revertedWith("Not started");
     });
