@@ -8,17 +8,16 @@ import {Context} from "@openzeppelin/contracts/utils/Context.sol";
  * @dev Faucet for the Sifa Game
  */
 contract Faucet is Context {
+	event Dropped(uint256 amount, address to);
+    error FaucetClaimNotAvailable(address to);
+    error FaucetNotEnoughETH(address to);
+    error FaucetHasNotEnoughTokens(uint256 remain);
+
     address public immutable TOKEN;
     uint256 public immutable DROP_AMOUNT = 10 * 10 ** 18;
     uint256 public immutable DELAY = 1 days;
     uint256 public constant REQUIRE_ETH = 10 ** 15;
     mapping(address => uint256) private _availableAt;
-
-    event Dropped(uint256 amount, address to);
-
-    error FaucetClaimNotAvailable(address to);
-    error FaucetNotEnoughETH(address to);
-    error FaucetHasNotEnoughTokens(uint256 remain);
 
     modifier canDrop(address to) {
         if (!available(to)) revert FaucetClaimNotAvailable(to);
