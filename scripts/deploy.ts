@@ -190,8 +190,7 @@ async function main() {
 
     // Fill emitter.
     const emitterAmount = config.Emitter.amount.toString();
-    await sifaToken.approve(emitterAddress, ethers.parseEther(emitterAmount));
-    await emitter.fill(ethers.parseEther(emitterAmount));
+    await sifaToken.transfer(emitterAddress, ethers.parseEther(emitterAmount));
   } else {
     emitterAddress = existingContracts.Emitter;
     console.log(`Emitter exist, using ${emitterAddress}`);
