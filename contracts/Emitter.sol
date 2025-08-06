@@ -104,6 +104,8 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         uint256 _epochEnd;
 
         (, _epochEnd) = _epochStartEnd(_firstEpoch);
+        // Ensure _epochEnd + 1 >= _start to prevent underflow
+        require(_epochEnd + 1 >= _start, "Invalid time range");
         uint256 _amount = (_epochEnd + 1 - _start) * this.rates(_firstEpoch);
 
         for (uint8 _epoch = _firstEpoch + 1; _epoch < _lastEpoch; _epoch++) {
