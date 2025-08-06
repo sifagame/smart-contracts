@@ -60,6 +60,8 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         address token_,
         address vault_
     ) Ownable(initialOwner_) {
+        require(token_ != address(0), "Token cannot be zero address");
+        require(vault_ != address(0), "Vault cannot be zero address");
         token = IERC20(token_);
         vault = IVault(vault_);
     }
