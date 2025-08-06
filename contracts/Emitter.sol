@@ -161,12 +161,16 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
     /// @dev This function might require large amount of gas when calling to withdraw after a very long period of time.
     function withdraw() external nonReentrant returns (bool) {
         require(started != 0, "Not started");
-        uint256 amount = this.available();
-        require(amount > 0, "Nothing to unlock");
+        
+        // Check vault total supply first to avoid expensive available() calculation
         if (vault.totalSupply() <= 0) {
             emit VaultIsEmpty();
             return false;
         }
+        
+        uint256 amount = this.available();
+        require(amount > 0, "Nothing to unlock");
+        
         released += amount;
         lastWithrawalAt = uint64(block.timestamp);
         token.transfer(address(vault), amount);
