@@ -114,6 +114,7 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         }
 
         (_epochStart, ) = _epochStartEnd(_lastEpoch);
+        require(_end >= _epochStart, "Invalid time range");
         _amount += (_end - _epochStart) * this.rates(_lastEpoch);
         return _amount;
     }
