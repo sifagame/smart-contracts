@@ -31,6 +31,13 @@ const config: HardhatUserConfig = {
   ignition: {
     requiredConfirmations: 5,
   },
+  gasReporter: {
+    enabled: true,
+    currency: 'USD',
+    gasPrice: 21,
+    showMethodSig: true,
+    showTimeSpent: true,
+  },
 };
 
 export default config;
