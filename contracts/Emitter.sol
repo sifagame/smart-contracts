@@ -145,8 +145,8 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         }
 
         uint256 amount = _getEmission(lastWithrawalAt, uint64(block.timestamp));
-
-        return this.locked() > amount ? amount : this.locked();
+        uint256 lockedAmount = token.balanceOf(address(this));
+        return lockedAmount > amount ? amount : lockedAmount;
     }
 
     function start() external onlyOwner nonReentrant returns (bool) {
