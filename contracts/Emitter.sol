@@ -60,6 +60,8 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         address token_,
         address vault_
     ) Ownable(initialOwner_) {
+        require(token_ != address(0), "Token cannot be zero address");
+        require(vault_ != address(0), "Vault cannot be zero address");
         token = IERC20(token_);
         vault = IVault(vault_);
     }
@@ -88,7 +90,7 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         uint64 _start,
         uint64 _end
     ) internal view returns (uint256) {
-        if (_start == _end) {
+        if (_start >= _end) {
             return 0;
         }
 
@@ -102,14 +104,17 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         uint256 _epochEnd;
 
         (, _epochEnd) = _epochStartEnd(_firstEpoch);
+        // Ensure _epochEnd + 1 >= _start to prevent underflow
+        require(_epochEnd + 1 >= _start, "Invalid time range");
         uint256 _amount = (_epochEnd + 1 - _start) * this.rates(_firstEpoch);
 
         for (uint8 _epoch = _firstEpoch + 1; _epoch < _lastEpoch; _epoch++) {
-            (_epochStart, _epochEnd) = _epochStartEnd(_firstEpoch);
+            (_epochStart, _epochEnd) = _epochStartEnd(_epoch);
             _amount += (_epochEnd - _epochStart) * this.rates(_epoch);
         }
 
         (_epochStart, ) = _epochStartEnd(_lastEpoch);
+        require(_end >= _epochStart, "Invalid time range");
         _amount += (_end - _epochStart) * this.rates(_lastEpoch);
         return _amount;
     }
@@ -140,8 +145,8 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         }
 
         uint256 amount = _getEmission(lastWithrawalAt, uint64(block.timestamp));
-
-        return this.locked() > amount ? amount : this.locked();
+        uint256 lockedAmount = token.balanceOf(address(this));
+        return lockedAmount > amount ? amount : lockedAmount;
     }
 
     function start() external onlyOwner nonReentrant returns (bool) {
@@ -156,12 +161,16 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
     /// @dev This function might require large amount of gas when calling to withdraw after a very long period of time.
     function withdraw() external nonReentrant returns (bool) {
         require(started != 0, "Not started");
-        uint256 amount = this.available();
-        require(amount > 0, "Nothing to unlock");
+        
+        // Check vault total supply first to avoid expensive available() calculation
         if (vault.totalSupply() <= 0) {
             emit VaultIsEmpty();
             return false;
         }
+        
+        uint256 amount = this.available();
+        require(amount > 0, "Nothing to unlock");
+        
         released += amount;
         lastWithrawalAt = uint64(block.timestamp);
         token.transfer(address(vault), amount);
