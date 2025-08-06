@@ -90,7 +90,7 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         uint64 _start,
         uint64 _end
     ) internal view returns (uint256) {
-        if (_start == _end) {
+        if (_start >= _end) {
             return 0;
         }
 
@@ -109,7 +109,7 @@ contract Emitter is IEmitter, Ownable, ReentrancyGuard, EmissionRates {
         uint256 _amount = (_epochEnd + 1 - _start) * this.rates(_firstEpoch);
 
         for (uint8 _epoch = _firstEpoch + 1; _epoch < _lastEpoch; _epoch++) {
-            (_epochStart, _epochEnd) = _epochStartEnd(_firstEpoch);
+            (_epochStart, _epochEnd) = _epochStartEnd(_epoch);
             _amount += (_epochEnd - _epochStart) * this.rates(_epoch);
         }
 
