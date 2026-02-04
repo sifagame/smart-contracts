@@ -11,6 +11,8 @@ import FaucetModule from "../ignition/modules/Faucet";
 import VaultModule from "../ignition/modules/Vault";
 import EmitterModule from "../ignition/modules/Emitter";
 import VestingVaultModule from "../ignition/modules/VestingVault";
+import SifaCurseModule from "../ignition/modules/SifaCurse";
+import SifaGameModule from "../ignition/modules/SifaGame";
 
 const logFile = `.contracts-${network.name}`;
 const contractsFile = logFile + ".json";
@@ -262,6 +264,68 @@ async function main() {
   }
 
   logContract(`Vesting: ${vestingAddress}`);
+
+  let curseAddress: string, sifaCurse;
+  if (!existingContracts.SifaCurse) {
+    // Deploy SifaCurse NFT.
+    const [curseOwner] = await ethers.getSigners();
+    const { sifaCurse: newCurse } = await ignition.deploy(SifaCurseModule, {
+      parameters: {
+        SifaCurse: { owner: await curseOwner.getAddress() },
+      },
+    });
+    sifaCurse = newCurse;
+    curseAddress = await sifaCurse.getAddress();
+
+    if (shouldVerify()) {
+      await run("verify:verify", {
+        address: curseAddress,
+        constructorArguments: [await curseOwner.getAddress()],
+      })
+        .then(console.log)
+        .catch(console.log);
+    }
+  } else {
+    curseAddress = existingContracts.SifaCurse;
+    console.log(`SifaCurse exist, using ${curseAddress}`);
+    const curseFactory = await ethers.getContractFactory("SifaCurse");
+    sifaCurse = curseFactory.attach(curseAddress);
+  }
+  logContract(`SifaCurse: ${curseAddress}`);
+
+  let gameAddress: string, sifaGame;
+  if (!existingContracts.SifaGame) {
+    // Deploy SifaGame.
+    const { sifaGame: newGame } = await ignition.deploy(SifaGameModule, {
+      parameters: {
+        SifaGame: {
+          token: tokenAddress,
+          curse: curseAddress,
+          vault: vaultAddress,
+        },
+      },
+    });
+    sifaGame = newGame;
+    gameAddress = await sifaGame.getAddress();
+
+    if (shouldVerify()) {
+      await run("verify:verify", {
+        address: gameAddress,
+        constructorArguments: [tokenAddress, curseAddress, vaultAddress],
+      })
+        .then(console.log)
+        .catch(console.log);
+    }
+  } else {
+    gameAddress = existingContracts.SifaGame;
+    console.log(`SifaGame exist, using ${gameAddress}`);
+    const gameFactory = await ethers.getContractFactory("SifaGame");
+    sifaGame = gameFactory.attach(gameAddress);
+  }
+  logContract(`SifaGame: ${gameAddress}`);
+
+  // Link curse to game — only SifaGame is allowed to mint curse NFTs.
+  await sifaCurse.setGameContract(gameAddress);
 
   updateContractsJson();
 }
