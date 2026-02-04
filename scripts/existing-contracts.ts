@@ -20,6 +20,8 @@ type ExistingContracts = {
   Vault?: string;
   Emitter?: string;
   Vesting?: string;
+  SifaCurse?: string;
+  SifaGame?: string;
 };
 
 const existingContracts: ExistingContracts =
