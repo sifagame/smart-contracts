@@ -563,4 +563,321 @@ describe("SifaGame", () => {
       expect(finalRound.state).to.equal(2); // Completed
     });
   });
+
+  describe("Round querying", () => {
+    describe("getRound", () => {
+      it("Should return correct RoundInfo for existing roundId", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const info = await game.getRound(1);
+        expect(info.creator).to.equal(p1.address);
+        expect(info.entryFee).to.equal(ENTRY_FEE);
+        expect(info.createdAt).to.be.gt(0);
+        expect(info.state).to.equal(0); // Pending
+        expect(info.playerCount).to.equal(1);
+      });
+
+      it("Should revert with RoundNotFound for roundId = 0", async () => {
+        const { game } = await loadFixture(deployGame);
+
+        await expect(game.getRound(0)).to.be.revertedWithCustomError(
+          game,
+          "RoundNotFound"
+        );
+      });
+
+      it("Should revert with RoundNotFound for roundId >= nextRoundId", async () => {
+        const { game } = await loadFixture(deployGame);
+
+        await expect(game.getRound(1)).to.be.revertedWithCustomError(
+          game,
+          "RoundNotFound"
+        );
+      });
+    });
+
+    describe("getRoundsByState", () => {
+      it("Should return pending rounds", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const result = await game.getRoundsByState(0, 0, 10);
+        expect(result.length).to.equal(1);
+        expect(result[0].creator).to.equal(p1.address);
+        expect(result[0].state).to.equal(0);
+      });
+
+      it("Should return active rounds", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        await createAndFillRound(game, [p1, p2, p3, p4]);
+
+        const result = await game.getRoundsByState(1, 0, 10);
+        expect(result.length).to.equal(1);
+        expect(result[0].state).to.equal(1);
+      });
+
+      it("Should return completed rounds", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        await createAndFillRound(game, [p1, p2, p3, p4]);
+        await playRound(game, 1n, [p1, p2, p3, p4]);
+
+        const result = await game.getRoundsByState(2, 0, 10);
+        expect(result.length).to.equal(1);
+        expect(result[0].state).to.equal(2);
+      });
+
+      it("Should return aborted rounds", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await time.increase(24 * 60 * 60 + 1);
+        await game.connect(p1).abortRound(1);
+
+        const result = await game.getRoundsByState(3, 0, 10);
+        expect(result.length).to.equal(1);
+        expect(result[0].state).to.equal(3);
+      });
+
+      it("Should return empty array when offset >= count", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const result = await game.getRoundsByState(0, 5, 10);
+        expect(result.length).to.equal(0);
+      });
+
+      it("Should return empty array when limit = 0", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const result = await game.getRoundsByState(0, 0, 0);
+        expect(result.length).to.equal(0);
+      });
+
+      it("Should paginate correctly with offset and limit", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const page1 = await game.getRoundsByState(0, 0, 2);
+        expect(page1.length).to.equal(2);
+
+        const page2 = await game.getRoundsByState(0, 2, 2);
+        expect(page2.length).to.equal(1);
+
+        const empty = await game.getRoundsByState(0, 3, 10);
+        expect(empty.length).to.equal(0);
+      });
+    });
+
+    describe("getRoundsCountByState", () => {
+      it("Should return correct count for each state", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        expect(await game.getRoundsCountByState(0)).to.equal(2);
+        expect(await game.getRoundsCountByState(1)).to.equal(0);
+        expect(await game.getRoundsCountByState(2)).to.equal(0);
+        expect(await game.getRoundsCountByState(3)).to.equal(0);
+      });
+    });
+
+    describe("State set transitions", () => {
+      it("After createRound, round is in Pending set", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        expect(await game.getRoundsCountByState(0)).to.equal(1);
+        const result = await game.getRoundsByState(0, 0, 10);
+        expect(result[0].creator).to.equal(p1.address);
+      });
+
+      it("After 4 players join, round moves from Pending to Active set", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        expect(await game.getRoundsCountByState(0)).to.equal(1);
+
+        await game.connect(p2).joinRound(1);
+        await game.connect(p3).joinRound(1);
+        await game.connect(p4).joinRound(1);
+
+        expect(await game.getRoundsCountByState(0)).to.equal(0);
+        expect(await game.getRoundsCountByState(1)).to.equal(1);
+      });
+
+      it("After round completes, round moves from Active to Completed set", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        await createAndFillRound(game, [p1, p2, p3, p4]);
+        expect(await game.getRoundsCountByState(1)).to.equal(1);
+
+        await playRound(game, 1n, [p1, p2, p3, p4]);
+
+        expect(await game.getRoundsCountByState(1)).to.equal(0);
+        expect(await game.getRoundsCountByState(2)).to.equal(1);
+      });
+
+      it("After abortRound, round moves from Pending to Aborted set", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        expect(await game.getRoundsCountByState(0)).to.equal(1);
+
+        await time.increase(24 * 60 * 60 + 1);
+        await game.connect(p1).abortRound(1);
+
+        expect(await game.getRoundsCountByState(0)).to.equal(0);
+        expect(await game.getRoundsCountByState(3)).to.equal(1);
+      });
+
+      it("Sum of all state counts equals nextRoundId - 1", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        // Round 1: stays Pending
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        // Round 2: filled → Active
+        await createAndFillRound(game, [p1, p2, p3, p4]);
+
+        // Round 3: created then Aborted
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await time.increase(24 * 60 * 60 + 1);
+        await game.connect(p1).abortRound(3);
+
+        const pending = Number(await game.getRoundsCountByState(0));
+        const active = Number(await game.getRoundsCountByState(1));
+        const completed = Number(await game.getRoundsCountByState(2));
+        const aborted = Number(await game.getRoundsCountByState(3));
+        const nextRoundId = Number(await game.nextRoundId());
+
+        expect(pending + active + completed + aborted).to.equal(nextRoundId - 1);
+      });
+    });
+  });
+
+  describe("Stress: 1000 rounds across all states", () => {
+    it("Should demonstrate O(1) set ops and O(k) pagination", async function () {
+      this.timeout(300000);
+      const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+      const SMALL_FEE = ethers.parseEther("0.01");
+      const TOTAL = 1000;
+      const FILL = 50;
+      const COMPLETE = 25;
+      const ABORT = 50;
+
+      // Phase 1: create 1000 pending rounds; sample createRound gas at 3 points
+      let firstCreateGas = 0n, midCreateGas = 0n, lastCreateGas = 0n;
+      for (let i = 0; i < TOTAL; i++) {
+        const tx = await game.connect(p1).createRound(SMALL_FEE);
+        const receipt = await tx.wait();
+        if (i === 0) firstCreateGas = receipt!.gasUsed;
+        if (i === 499) midCreateGas = receipt!.gasUsed;
+        if (i === 999) lastCreateGas = receipt!.gasUsed;
+      }
+
+      // Phase 2: fill rounds 1..50 → Active; sample 4th-join gas (triggers _startRound)
+      let firstJoinGas = 0n, lastJoinGas = 0n;
+      for (let i = 1; i <= FILL; i++) {
+        await game.connect(p2).joinRound(i);
+        await game.connect(p3).joinRound(i);
+        const tx = await game.connect(p4).joinRound(i);
+        const receipt = await tx.wait();
+        if (i === 1) firstJoinGas = receipt!.gasUsed;
+        if (i === FILL) lastJoinGas = receipt!.gasUsed;
+      }
+
+      // Phase 3: play rounds 1..25 → Completed
+      for (let i = 1; i <= COMPLETE; i++) {
+        await playRound(game, BigInt(i), [p1, p2, p3, p4]);
+      }
+
+      // Phase 4: abort rounds 51..100 → Aborted; sample gas
+      await time.increase(24 * 60 * 60 + 1);
+      let firstAbortGas = 0n, lastAbortGas = 0n;
+      for (let i = FILL + 1; i <= FILL + ABORT; i++) {
+        const tx = await game.connect(p1).abortRound(i);
+        const receipt = await tx.wait();
+        if (i === FILL + 1) firstAbortGas = receipt!.gasUsed;
+        if (i === FILL + ABORT) lastAbortGas = receipt!.gasUsed;
+      }
+
+      // ── invariant ──────────────────────────────────────────────
+      const pending = Number(await game.getRoundsCountByState(0));
+      const active = Number(await game.getRoundsCountByState(1));
+      const completed = Number(await game.getRoundsCountByState(2));
+      const aborted = Number(await game.getRoundsCountByState(3));
+
+      expect(pending).to.equal(900);   // 1000 - 50 filled - 50 aborted
+      expect(active).to.equal(25);     // 50 filled - 25 completed
+      expect(completed).to.equal(25);
+      expect(aborted).to.equal(50);
+      expect(pending + active + completed + aborted).to.equal(TOTAL);
+
+      // ── gas assertions: state-changing ops stay O(1) ──────────
+      // createRound: _pendingRounds.add is O(1) as set grows 0→1000
+      expect(midCreateGas).to.be.lt(firstCreateGas * 2n);
+      expect(lastCreateGas).to.be.lt(firstCreateGas * 2n);
+      // 4th joinRound: remove(pending) + add(active) stays flat
+      expect(lastJoinGas).to.be.lt(firstJoinGas * 2n);
+      // abortRound: remove(pending) + add(aborted) stays flat
+      expect(lastAbortGas).to.be.lt(firstAbortGas * 2n);
+
+      // ── gas assertions: view queries ───────────────────────────
+      // count is O(1) regardless of set size
+      const countGas900 = await game.getRoundsCountByState.estimateGas(0); // 900 elements
+      const countGas25 = await game.getRoundsCountByState.estimateGas(1);  // 25 elements
+      expect(countGas900).to.be.lt(countGas25 * 2n);
+
+      // pagination gas scales with limit (elements read), not total set size
+      const qLimit10 = await game.getRoundsByState.estimateGas(0, 0, 10);
+      const qLimit50 = await game.getRoundsByState.estimateGas(0, 0, 50);
+      const qLimit100 = await game.getRoundsByState.estimateGas(0, 0, 100);
+      expect(qLimit50).to.be.gt(qLimit10);
+      expect(qLimit100).to.be.gt(qLimit50);
+
+      // EnumerableSet.at() is O(1): offset does not affect gas
+      const qOff0 = await game.getRoundsByState.estimateGas(0, 0, 10);
+      const qOff450 = await game.getRoundsByState.estimateGas(0, 450, 10);
+      const qOff890 = await game.getRoundsByState.estimateGas(0, 890, 10);
+      expect(qOff450).to.be.lt(qOff0 * 2n);
+      expect(qOff890).to.be.lt(qOff0 * 2n);
+
+      // ── log report ─────────────────────────────────────────────
+      console.log("\n  ── createRound gas (pendingSet grows 0 → 1000) ──");
+      console.log(`      set size    1: ${firstCreateGas} gas`);
+      console.log(`      set size  500: ${midCreateGas} gas`);
+      console.log(`      set size 1000: ${lastCreateGas} gas`);
+      console.log("  ── 4th joinRound gas (remove pending + add active) ──");
+      console.log(`      round   1: ${firstJoinGas} gas`);
+      console.log(`      round  50: ${lastJoinGas} gas`);
+      console.log("  ── abortRound gas (remove pending + add aborted) ──");
+      console.log(`      round  51: ${firstAbortGas} gas`);
+      console.log(`      round 100: ${lastAbortGas} gas`);
+      console.log("  ── getRoundsCountByState gas ──");
+      console.log(`      pending (900): ${countGas900} gas`);
+      console.log(`      active  ( 25): ${countGas25} gas`);
+      console.log("  ── getRoundsByState gas (pending set, 900 rounds) ──");
+      console.log(`      limit=10:  ${qLimit10} gas`);
+      console.log(`      limit=50:  ${qLimit50} gas`);
+      console.log(`      limit=100: ${qLimit100} gas`);
+      console.log("  ── offset independence (limit=10 across pending set) ──");
+      console.log(`      offset=  0: ${qOff0} gas`);
+      console.log(`      offset=450: ${qOff450} gas`);
+      console.log(`      offset=890: ${qOff890} gas`);
+    });
+  });
 });

@@ -5,8 +5,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {ISifaGame} from "./interfaces/ISifaGame.sol";
 import {ISifaCurse} from "./interfaces/ISifaCurse.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract SifaGame is ISifaGame, ReentrancyGuard {
+    using EnumerableSet for EnumerableSet.UintSet;
+
     IERC20 public immutable token;
     ISifaCurse public immutable curse;
     address public immutable vault;
@@ -16,6 +19,11 @@ contract SifaGame is ISifaGame, ReentrancyGuard {
     mapping(uint256 => Round) public rounds;
     uint256 public nextRoundId = 1;
     uint256 private nonce;
+
+    EnumerableSet.UintSet private _pendingRounds;
+    EnumerableSet.UintSet private _activeRounds;
+    EnumerableSet.UintSet private _completedRounds;
+    EnumerableSet.UintSet private _abortedRounds;
 
     constructor(address token_, address curse_, address vault_) {
         token = IERC20(token_);
@@ -45,6 +53,7 @@ contract SifaGame is ISifaGame, ReentrancyGuard {
         round.players[0] = msg.sender;
         round.playerCount = 1;
         round.state = RoundState.Pending;
+        _pendingRounds.add(roundId);
 
         token.transferFrom(msg.sender, address(this), entryFee);
 
@@ -83,6 +92,8 @@ contract SifaGame is ISifaGame, ReentrancyGuard {
     function _startRound(uint256 roundId) internal {
         Round storage round = rounds[roundId];
         round.state = RoundState.Active;
+        _pendingRounds.remove(roundId);
+        _activeRounds.add(roundId);
         round.throwCount = uint8(6 + _random(roundId) % 7);
         round.tagHolderIndex = uint8(_random(roundId) % 4);
         round.lastThrowTimestamp = block.timestamp;
@@ -135,6 +146,8 @@ contract SifaGame is ISifaGame, ReentrancyGuard {
     function _completeRound(uint256 roundId) internal {
         Round storage round = rounds[roundId];
         round.state = RoundState.Completed;
+        _activeRounds.remove(roundId);
+        _completedRounds.add(roundId);
 
         address loser = round.players[round.tagHolderIndex];
         address[3] memory winners;
@@ -171,11 +184,75 @@ contract SifaGame is ISifaGame, ReentrancyGuard {
         if (round.state != RoundState.Pending) revert RoundAlreadyStarted();
 
         round.state = RoundState.Aborted;
+        _pendingRounds.remove(roundId);
+        _abortedRounds.add(roundId);
 
         for (uint8 i = 0; i < round.playerCount; i++) {
             token.transfer(round.players[i], round.entryFee);
         }
 
         emit RoundAborted(roundId);
+    }
+
+    /// @dev Get round information by its unique identifier
+    /// @param roundId The unique identifier of the round
+    /// @return Round information as a RoundInfo struct
+    function getRound(uint256 roundId) external view returns (RoundInfo memory) {
+        if (roundId == 0 || roundId >= nextRoundId) revert RoundNotFound();
+        Round storage round = rounds[roundId];
+        return RoundInfo({
+            creator: round.creator,
+            entryFee: round.entryFee,
+            createdAt: round.createdAt,
+            state: round.state,
+            playerCount: round.playerCount
+        });
+    }
+
+    /// @dev Get rounds filtered by state with pagination
+    /// @param state The round state to filter by
+    /// @param offset Zero-based index to start reading from
+    /// @param limit Maximum number of rounds to return
+    /// @return Array of RoundInfo structs matching the specified state
+    function getRoundsByState(RoundState state, uint256 offset, uint256 limit) external view returns (RoundInfo[] memory) {
+        EnumerableSet.UintSet storage set = _getSetByState(state);
+        uint256 total = set.length();
+
+        if (offset >= total || limit == 0) return new RoundInfo[](0);
+
+        uint256 end = offset + limit > total ? total : offset + limit;
+        uint256 count = end - offset;
+
+        RoundInfo[] memory result = new RoundInfo[](count);
+        for (uint256 i = 0; i < count; i++) {
+            uint256 id = set.at(offset + i);
+            Round storage round = rounds[id];
+            result[i] = RoundInfo({
+                creator: round.creator,
+                entryFee: round.entryFee,
+                createdAt: round.createdAt,
+                state: round.state,
+                playerCount: round.playerCount
+            });
+        }
+
+        return result;
+    }
+
+    /// @dev Get the total number of rounds in a given state
+    /// @param state The round state to count
+    /// @return The number of rounds in the specified state
+    function getRoundsCountByState(RoundState state) external view returns (uint256) {
+        return _getSetByState(state).length();
+    }
+
+    /// @dev Get the state set corresponding to the given round state
+    /// @param state The round state
+    /// @return Reference to the EnumerableSet for the specified state
+    function _getSetByState(RoundState state) internal view returns (EnumerableSet.UintSet storage) {
+        if (state == RoundState.Pending) return _pendingRounds;
+        if (state == RoundState.Active) return _activeRounds;
+        if (state == RoundState.Completed) return _completedRounds;
+        return _abortedRounds;
     }
 }
