@@ -563,4 +563,208 @@ describe("SifaGame", () => {
       expect(finalRound.state).to.equal(2); // Completed
     });
   });
+
+  describe("Round querying", () => {
+    describe("getRound", () => {
+      it("Should return correct RoundInfo for existing roundId", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const info = await game.getRound(1);
+        expect(info.creator).to.equal(p1.address);
+        expect(info.entryFee).to.equal(ENTRY_FEE);
+        expect(info.createdAt).to.be.gt(0);
+        expect(info.state).to.equal(0); // Pending
+        expect(info.playerCount).to.equal(1);
+      });
+
+      it("Should revert with RoundNotFound for roundId = 0", async () => {
+        const { game } = await loadFixture(deployGame);
+
+        await expect(game.getRound(0)).to.be.revertedWithCustomError(
+          game,
+          "RoundNotFound"
+        );
+      });
+
+      it("Should revert with RoundNotFound for roundId >= nextRoundId", async () => {
+        const { game } = await loadFixture(deployGame);
+
+        await expect(game.getRound(1)).to.be.revertedWithCustomError(
+          game,
+          "RoundNotFound"
+        );
+      });
+    });
+
+    describe("getRoundsByState", () => {
+      it("Should return pending rounds", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const result = await game.getRoundsByState(0, 0, 10);
+        expect(result.length).to.equal(1);
+        expect(result[0].creator).to.equal(p1.address);
+        expect(result[0].state).to.equal(0);
+      });
+
+      it("Should return active rounds", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        await createAndFillRound(game, [p1, p2, p3, p4]);
+
+        const result = await game.getRoundsByState(1, 0, 10);
+        expect(result.length).to.equal(1);
+        expect(result[0].state).to.equal(1);
+      });
+
+      it("Should return completed rounds", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        await createAndFillRound(game, [p1, p2, p3, p4]);
+        await playRound(game, 1n, [p1, p2, p3, p4]);
+
+        const result = await game.getRoundsByState(2, 0, 10);
+        expect(result.length).to.equal(1);
+        expect(result[0].state).to.equal(2);
+      });
+
+      it("Should return aborted rounds", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await time.increase(24 * 60 * 60 + 1);
+        await game.connect(p1).abortRound(1);
+
+        const result = await game.getRoundsByState(3, 0, 10);
+        expect(result.length).to.equal(1);
+        expect(result[0].state).to.equal(3);
+      });
+
+      it("Should return empty array when offset >= count", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const result = await game.getRoundsByState(0, 5, 10);
+        expect(result.length).to.equal(0);
+      });
+
+      it("Should return empty array when limit = 0", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const result = await game.getRoundsByState(0, 0, 0);
+        expect(result.length).to.equal(0);
+      });
+
+      it("Should paginate correctly with offset and limit", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        const page1 = await game.getRoundsByState(0, 0, 2);
+        expect(page1.length).to.equal(2);
+
+        const page2 = await game.getRoundsByState(0, 2, 2);
+        expect(page2.length).to.equal(1);
+
+        const empty = await game.getRoundsByState(0, 3, 10);
+        expect(empty.length).to.equal(0);
+      });
+    });
+
+    describe("getRoundsCountByState", () => {
+      it("Should return correct count for each state", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        expect(await game.getRoundsCountByState(0)).to.equal(2);
+        expect(await game.getRoundsCountByState(1)).to.equal(0);
+        expect(await game.getRoundsCountByState(2)).to.equal(0);
+        expect(await game.getRoundsCountByState(3)).to.equal(0);
+      });
+    });
+
+    describe("State set transitions", () => {
+      it("After createRound, round is in Pending set", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        expect(await game.getRoundsCountByState(0)).to.equal(1);
+        const result = await game.getRoundsByState(0, 0, 10);
+        expect(result[0].creator).to.equal(p1.address);
+      });
+
+      it("After 4 players join, round moves from Pending to Active set", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        expect(await game.getRoundsCountByState(0)).to.equal(1);
+
+        await game.connect(p2).joinRound(1);
+        await game.connect(p3).joinRound(1);
+        await game.connect(p4).joinRound(1);
+
+        expect(await game.getRoundsCountByState(0)).to.equal(0);
+        expect(await game.getRoundsCountByState(1)).to.equal(1);
+      });
+
+      it("After round completes, round moves from Active to Completed set", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        await createAndFillRound(game, [p1, p2, p3, p4]);
+        expect(await game.getRoundsCountByState(1)).to.equal(1);
+
+        await playRound(game, 1n, [p1, p2, p3, p4]);
+
+        expect(await game.getRoundsCountByState(1)).to.equal(0);
+        expect(await game.getRoundsCountByState(2)).to.equal(1);
+      });
+
+      it("After abortRound, round moves from Pending to Aborted set", async () => {
+        const { game, p1 } = await loadFixture(deployGame);
+
+        await game.connect(p1).createRound(ENTRY_FEE);
+        expect(await game.getRoundsCountByState(0)).to.equal(1);
+
+        await time.increase(24 * 60 * 60 + 1);
+        await game.connect(p1).abortRound(1);
+
+        expect(await game.getRoundsCountByState(0)).to.equal(0);
+        expect(await game.getRoundsCountByState(3)).to.equal(1);
+      });
+
+      it("Sum of all state counts equals nextRoundId - 1", async () => {
+        const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+        // Round 1: stays Pending
+        await game.connect(p1).createRound(ENTRY_FEE);
+
+        // Round 2: filled → Active
+        await createAndFillRound(game, [p1, p2, p3, p4]);
+
+        // Round 3: created then Aborted
+        await game.connect(p1).createRound(ENTRY_FEE);
+        await time.increase(24 * 60 * 60 + 1);
+        await game.connect(p1).abortRound(3);
+
+        const pending = Number(await game.getRoundsCountByState(0));
+        const active = Number(await game.getRoundsCountByState(1));
+        const completed = Number(await game.getRoundsCountByState(2));
+        const aborted = Number(await game.getRoundsCountByState(3));
+        const nextRoundId = Number(await game.nextRoundId());
+
+        expect(pending + active + completed + aborted).to.equal(nextRoundId - 1);
+      });
+    });
+  });
 });
