@@ -767,4 +767,117 @@ describe("SifaGame", () => {
       });
     });
   });
+
+  describe("Stress: 1000 rounds across all states", () => {
+    it("Should demonstrate O(1) set ops and O(k) pagination", async function () {
+      this.timeout(300000);
+      const { game, p1, p2, p3, p4 } = await loadFixture(deployGame);
+
+      const SMALL_FEE = ethers.parseEther("0.01");
+      const TOTAL = 1000;
+      const FILL = 50;
+      const COMPLETE = 25;
+      const ABORT = 50;
+
+      // Phase 1: create 1000 pending rounds; sample createRound gas at 3 points
+      let firstCreateGas = 0n, midCreateGas = 0n, lastCreateGas = 0n;
+      for (let i = 0; i < TOTAL; i++) {
+        const tx = await game.connect(p1).createRound(SMALL_FEE);
+        const receipt = await tx.wait();
+        if (i === 0) firstCreateGas = receipt!.gasUsed;
+        if (i === 499) midCreateGas = receipt!.gasUsed;
+        if (i === 999) lastCreateGas = receipt!.gasUsed;
+      }
+
+      // Phase 2: fill rounds 1..50 → Active; sample 4th-join gas (triggers _startRound)
+      let firstJoinGas = 0n, lastJoinGas = 0n;
+      for (let i = 1; i <= FILL; i++) {
+        await game.connect(p2).joinRound(i);
+        await game.connect(p3).joinRound(i);
+        const tx = await game.connect(p4).joinRound(i);
+        const receipt = await tx.wait();
+        if (i === 1) firstJoinGas = receipt!.gasUsed;
+        if (i === FILL) lastJoinGas = receipt!.gasUsed;
+      }
+
+      // Phase 3: play rounds 1..25 → Completed
+      for (let i = 1; i <= COMPLETE; i++) {
+        await playRound(game, BigInt(i), [p1, p2, p3, p4]);
+      }
+
+      // Phase 4: abort rounds 51..100 → Aborted; sample gas
+      await time.increase(24 * 60 * 60 + 1);
+      let firstAbortGas = 0n, lastAbortGas = 0n;
+      for (let i = FILL + 1; i <= FILL + ABORT; i++) {
+        const tx = await game.connect(p1).abortRound(i);
+        const receipt = await tx.wait();
+        if (i === FILL + 1) firstAbortGas = receipt!.gasUsed;
+        if (i === FILL + ABORT) lastAbortGas = receipt!.gasUsed;
+      }
+
+      // ── invariant ──────────────────────────────────────────────
+      const pending = Number(await game.getRoundsCountByState(0));
+      const active = Number(await game.getRoundsCountByState(1));
+      const completed = Number(await game.getRoundsCountByState(2));
+      const aborted = Number(await game.getRoundsCountByState(3));
+
+      expect(pending).to.equal(900);   // 1000 - 50 filled - 50 aborted
+      expect(active).to.equal(25);     // 50 filled - 25 completed
+      expect(completed).to.equal(25);
+      expect(aborted).to.equal(50);
+      expect(pending + active + completed + aborted).to.equal(TOTAL);
+
+      // ── gas assertions: state-changing ops stay O(1) ──────────
+      // createRound: _pendingRounds.add is O(1) as set grows 0→1000
+      expect(midCreateGas).to.be.lt(firstCreateGas * 2n);
+      expect(lastCreateGas).to.be.lt(firstCreateGas * 2n);
+      // 4th joinRound: remove(pending) + add(active) stays flat
+      expect(lastJoinGas).to.be.lt(firstJoinGas * 2n);
+      // abortRound: remove(pending) + add(aborted) stays flat
+      expect(lastAbortGas).to.be.lt(firstAbortGas * 2n);
+
+      // ── gas assertions: view queries ───────────────────────────
+      // count is O(1) regardless of set size
+      const countGas900 = await game.getRoundsCountByState.estimateGas(0); // 900 elements
+      const countGas25 = await game.getRoundsCountByState.estimateGas(1);  // 25 elements
+      expect(countGas900).to.be.lt(countGas25 * 2n);
+
+      // pagination gas scales with limit (elements read), not total set size
+      const qLimit10 = await game.getRoundsByState.estimateGas(0, 0, 10);
+      const qLimit50 = await game.getRoundsByState.estimateGas(0, 0, 50);
+      const qLimit100 = await game.getRoundsByState.estimateGas(0, 0, 100);
+      expect(qLimit50).to.be.gt(qLimit10);
+      expect(qLimit100).to.be.gt(qLimit50);
+
+      // EnumerableSet.at() is O(1): offset does not affect gas
+      const qOff0 = await game.getRoundsByState.estimateGas(0, 0, 10);
+      const qOff450 = await game.getRoundsByState.estimateGas(0, 450, 10);
+      const qOff890 = await game.getRoundsByState.estimateGas(0, 890, 10);
+      expect(qOff450).to.be.lt(qOff0 * 2n);
+      expect(qOff890).to.be.lt(qOff0 * 2n);
+
+      // ── log report ─────────────────────────────────────────────
+      console.log("\n  ── createRound gas (pendingSet grows 0 → 1000) ──");
+      console.log(`      set size    1: ${firstCreateGas} gas`);
+      console.log(`      set size  500: ${midCreateGas} gas`);
+      console.log(`      set size 1000: ${lastCreateGas} gas`);
+      console.log("  ── 4th joinRound gas (remove pending + add active) ──");
+      console.log(`      round   1: ${firstJoinGas} gas`);
+      console.log(`      round  50: ${lastJoinGas} gas`);
+      console.log("  ── abortRound gas (remove pending + add aborted) ──");
+      console.log(`      round  51: ${firstAbortGas} gas`);
+      console.log(`      round 100: ${lastAbortGas} gas`);
+      console.log("  ── getRoundsCountByState gas ──");
+      console.log(`      pending (900): ${countGas900} gas`);
+      console.log(`      active  ( 25): ${countGas25} gas`);
+      console.log("  ── getRoundsByState gas (pending set, 900 rounds) ──");
+      console.log(`      limit=10:  ${qLimit10} gas`);
+      console.log(`      limit=50:  ${qLimit50} gas`);
+      console.log(`      limit=100: ${qLimit100} gas`);
+      console.log("  ── offset independence (limit=10 across pending set) ──");
+      console.log(`      offset=  0: ${qOff0} gas`);
+      console.log(`      offset=450: ${qOff450} gas`);
+      console.log(`      offset=890: ${qOff890} gas`);
+    });
+  });
 });
